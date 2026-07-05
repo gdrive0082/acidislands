@@ -13,8 +13,8 @@ island-start-grid-index: 1
 
 # Cooldown create/delete island untuk mencegah farming reset island.
 cooldowns:
-  create-seconds: 1800
-  delete-seconds: 1800
+  create-seconds: 120
+  delete-seconds: 120
 
 # Koordinat lobby awal (akan diisi via /ai setlobby)
 lobby:
