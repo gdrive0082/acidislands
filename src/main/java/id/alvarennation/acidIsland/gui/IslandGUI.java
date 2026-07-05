@@ -1127,16 +1127,28 @@ public class IslandGUI implements Listener {
                 player.sendMessage(plugin.getConfigManager().format("&cKamu baru bisa membuat island lagi dalam " + formatDuration(plugin.getIslandManager().getCreateCooldownRemainingMillis(player.getUniqueId())) + "."));
                 return;
             }
+            if (plugin.getIslandManager().isIslandCreatePending(player.getUniqueId())) {
+                player.closeInventory();
+                player.sendMessage(plugin.getConfigManager().format("&eIsland kamu sedang dibuat. Tunggu sebentar."));
+                return;
+            }
             player.closeInventory();
-            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
-            
-            // Create island
-            Island island = plugin.getIslandManager().createIsland(player.getUniqueId(), type);
-            player.sendMessage(plugin.getConfigManager().getMessage(player, "island-created"));
-            
-            // Teleport to home
-            player.teleport(island.getHome(plugin.getWorldManager().getAcidWorld()));
-            plugin.getWorldManager().applyWorldBorder(player, island);
+            player.sendMessage(plugin.getConfigManager().format("&eIsland sedang dibuat. Chunk area island dimuat dulu supaya server tidak freeze."));
+
+            plugin.getIslandManager().createIslandAsync(player.getUniqueId(), type, true).whenComplete((island, throwable) ->
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (throwable != null) {
+                            player.sendMessage(plugin.getConfigManager().format("&cIsland gagal dibuat: " + throwable.getMessage()));
+                            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                            plugin.getLogger().warning("Failed to create island for " + player.getUniqueId() + ": " + throwable.getMessage());
+                            return;
+                        }
+
+                        player.sendMessage(plugin.getConfigManager().getMessage(player, "island-created"));
+                        player.teleport(island.getHome(plugin.getWorldManager().getAcidWorld()));
+                        plugin.getWorldManager().applyWorldBorder(player, island);
+                        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    }));
         }
     }
 
@@ -1540,17 +1552,28 @@ public class IslandGUI implements Listener {
             teleportParticipantsToLobby(oldIsland);
         }
 
-        Island newIsland = plugin.getIslandManager().createIsland(targetUuid, "classic", false);
-        Player onlineTarget = Bukkit.getPlayer(targetUuid);
-        if (onlineTarget != null) {
-            onlineTarget.teleport(newIsland.getHome(plugin.getWorldManager().getAcidWorld()));
-            plugin.getWorldManager().applyWorldBorder(onlineTarget, newIsland);
-            onlineTarget.sendMessage(plugin.getConfigManager().format("&aIsland kamu sudah direset oleh admin."));
-        }
+        admin.closeInventory();
+        admin.sendMessage(plugin.getConfigManager().format("&eReset island " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + " sedang diproses. Chunk area island dimuat async dulu."));
+        plugin.getIslandManager().createIslandAsync(targetUuid, "classic", false).whenComplete((newIsland, throwable) ->
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (throwable != null) {
+                        admin.sendMessage(plugin.getConfigManager().format("&cReset island gagal: " + throwable.getMessage()));
+                        admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                        plugin.getLogger().warning("Failed to reset island for " + targetUuid + ": " + throwable.getMessage());
+                        return;
+                    }
 
-        admin.sendMessage(plugin.getConfigManager().format("&aIsland milik " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + " sudah direset."));
-        admin.playSound(admin.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
-        openAdminPlayerGUI(admin, targetUuid);
+                    Player onlineTarget = Bukkit.getPlayer(targetUuid);
+                    if (onlineTarget != null) {
+                        onlineTarget.teleport(newIsland.getHome(plugin.getWorldManager().getAcidWorld()));
+                        plugin.getWorldManager().applyWorldBorder(onlineTarget, newIsland);
+                        onlineTarget.sendMessage(plugin.getConfigManager().format("&aIsland kamu sudah direset oleh admin."));
+                    }
+
+                    admin.sendMessage(plugin.getConfigManager().format("&aIsland milik " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + " sudah direset."));
+                    admin.playSound(admin.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+                    openAdminPlayerGUI(admin, targetUuid);
+                }));
     }
 
     private void adminDeleteOwnedIsland(Player admin, UUID targetUuid) {

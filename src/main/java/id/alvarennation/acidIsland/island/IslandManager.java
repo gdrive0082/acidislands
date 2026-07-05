@@ -1,6 +1,7 @@
 package id.alvarennation.acidIsland.island;
 
 import id.alvarennation.acidIsland.AcidIsland;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
@@ -11,9 +12,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.concurrent.CompletableFuture;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class IslandManager {
@@ -29,6 +33,7 @@ public class IslandManager {
     private final Map<UUID, Long> lastIslandCreateMillis = new HashMap<>();
     private final Map<UUID, Long> lastIslandDeleteMillis = new HashMap<>();
     private final Map<UUID, Integer> storyStages = new HashMap<>();
+    private final Set<UUID> pendingIslandCreates = new HashSet<>();
 
     private int nextGridIndex = 0;
 
@@ -49,6 +54,7 @@ public class IslandManager {
         lastIslandCreateMillis.clear();
         lastIslandDeleteMillis.clear();
         storyStages.clear();
+        pendingIslandCreates.clear();
 
         if (!dataFile.exists()) {
             try {
@@ -215,6 +221,10 @@ public class IslandManager {
         return getIslandByPlayer(uuid) != null;
     }
 
+    public boolean isIslandCreatePending(UUID ownerUuid) {
+        return pendingIslandCreates.contains(ownerUuid);
+    }
+
     public Island createIsland(UUID ownerUuid, String type) {
         return createIsland(ownerUuid, type, true);
     }
@@ -242,6 +252,66 @@ public class IslandManager {
         saveData();
 
         return island;
+    }
+
+    public CompletableFuture<Island> createIslandAsync(UUID ownerUuid, String type, boolean recordCooldown) {
+        CompletableFuture<Island> result = new CompletableFuture<>();
+        if (!Bukkit.isPrimaryThread()) {
+            Bukkit.getScheduler().runTask(plugin, () -> createIslandAsync(ownerUuid, type, recordCooldown)
+                    .whenComplete((island, throwable) -> {
+                        if (throwable != null) {
+                            result.completeExceptionally(throwable);
+                        } else {
+                            result.complete(island);
+                        }
+                    }));
+            return result;
+        }
+
+        if (islandsByOwner.containsKey(ownerUuid)) {
+            result.completeExceptionally(new IllegalStateException("Player already owns an island: " + ownerUuid));
+            return result;
+        }
+        if (pendingIslandCreates.contains(ownerUuid)) {
+            result.completeExceptionally(new IllegalStateException("Island creation is already running for: " + ownerUuid));
+            return result;
+        }
+
+        int spacing = plugin.getConfigManager().getConfig().getInt("island-spacing", 400);
+        int[] grid = gridForIndex(nextGridIndex);
+        int cx = grid[0] * spacing;
+        int cz = grid[1] * spacing;
+        nextGridIndex++;
+        pendingIslandCreates.add(ownerUuid);
+
+        plugin.getWorldManager().preloadStarterIslandChunks(cx, cz).whenComplete((ignored, throwable) ->
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    try {
+                        if (throwable != null) {
+                            result.completeExceptionally(throwable);
+                            return;
+                        }
+
+                        plugin.getWorldManager().generateStarterIsland(cx, cz, type);
+
+                        Island island = new Island(ownerUuid, cx, cz);
+                        island.setTheme(type);
+                        islandsByOwner.put(ownerUuid, island);
+                        indexIsland(island);
+                        if (recordCooldown) {
+                            lastIslandCreateMillis.put(ownerUuid, System.currentTimeMillis());
+                        }
+                        plugin.getWorldManager().applyIslandTheme(island, type);
+                        saveData();
+                        result.complete(island);
+                    } catch (Throwable ex) {
+                        result.completeExceptionally(ex);
+                    } finally {
+                        pendingIslandCreates.remove(ownerUuid);
+                    }
+                }));
+
+        return result;
     }
 
     public Island deleteIsland(UUID ownerUuid) {

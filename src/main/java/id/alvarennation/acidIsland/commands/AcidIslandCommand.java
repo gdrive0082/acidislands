@@ -216,14 +216,23 @@ public class AcidIslandCommand implements CommandExecutor {
                 if (oldIsland != null) {
                     teleportParticipantsToLobby(oldIsland);
                 }
-                Island newIsland = plugin.getIslandManager().createIsland(targetUuid, "classic", false);
-                Player onlineTarget = target.getPlayer();
-                if (onlineTarget != null) {
-                    onlineTarget.teleport(newIsland.getHome(plugin.getWorldManager().getAcidWorld()));
-                    plugin.getWorldManager().applyWorldBorder(onlineTarget, newIsland);
-                    onlineTarget.sendMessage(plugin.getConfigManager().format("&aIsland kamu sudah direset oleh admin."));
-                }
-                sender.sendMessage("§aIsland milik " + args[2] + " sudah direset.");
+                sender.sendMessage("§eReset island " + args[2] + " sedang diproses. Chunk area island dimuat async dulu agar server tidak freeze.");
+                plugin.getIslandManager().createIslandAsync(targetUuid, "classic", false).whenComplete((newIsland, throwable) ->
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            if (throwable != null) {
+                                sender.sendMessage("§cReset island " + args[2] + " gagal: " + throwable.getMessage());
+                                plugin.getLogger().warning("Failed to reset island for " + targetUuid + ": " + throwable.getMessage());
+                                return;
+                            }
+
+                            Player onlineTarget = target.getPlayer();
+                            if (onlineTarget != null) {
+                                onlineTarget.teleport(newIsland.getHome(plugin.getWorldManager().getAcidWorld()));
+                                plugin.getWorldManager().applyWorldBorder(onlineTarget, newIsland);
+                                onlineTarget.sendMessage(plugin.getConfigManager().format("&aIsland kamu sudah direset oleh admin."));
+                            }
+                            sender.sendMessage("§aIsland milik " + args[2] + " sudah direset.");
+                        }));
             }
             case "tp" -> {
                 if (!(sender instanceof Player adminPlayer)) {

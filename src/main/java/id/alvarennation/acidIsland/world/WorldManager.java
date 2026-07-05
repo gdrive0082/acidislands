@@ -23,6 +23,8 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
@@ -99,6 +101,26 @@ public class WorldManager {
         }
 
         generateMiniMonument(cx, Math.max(world.getMinHeight() + 12, waterHeight - 22), cz);
+    }
+
+    public CompletableFuture<Void> preloadStarterIslandChunks(int cx, int cz) {
+        World world = getAcidWorld();
+        int minChunkX = blockToChunk(cx - 12);
+        int maxChunkX = blockToChunk(cx + 12);
+        int minChunkZ = blockToChunk(cz - 8);
+        int maxChunkZ = blockToChunk(cz + 8);
+
+        List<CompletableFuture<Chunk>> chunkLoads = new ArrayList<>();
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                chunkLoads.add(world.getChunkAtAsync(chunkX, chunkZ, true));
+            }
+        }
+        return CompletableFuture.allOf(chunkLoads.toArray(CompletableFuture[]::new));
+    }
+
+    private int blockToChunk(int blockCoordinate) {
+        return Math.floorDiv(blockCoordinate, 16);
     }
 
     private void generateFallbackCrimsonFungus(int cx, int baseY, int cz) {
