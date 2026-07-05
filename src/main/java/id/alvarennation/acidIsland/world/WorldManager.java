@@ -87,8 +87,8 @@ public class WorldManager {
 
     public void generateStarterIsland(int cx, int cz, String type) {
         World world = getAcidWorld();
-        int islandY = 75; // Ketinggian pulau starter
         int waterHeight = plugin.getConfigManager().getConfig().getInt("acid-water.height", 62);
+        int islandY = getStarterIslandY();
         String starterType = type == null ? "classic" : type.toLowerCase(Locale.ROOT);
         StarterPalette palette = StarterPalette.from(starterType);
         Random random = new Random((((long) cx) << 32) ^ cz ^ starterType.hashCode());
@@ -121,15 +121,18 @@ public class WorldManager {
             plugin.getLogger().warning("Failed to attach starter sheep leash at " + cx + ", " + cz + ": " + ex.getMessage());
         }
 
-        generateMiniMonument(cx, Math.max(world.getMinHeight() + 16, waterHeight - 34), cz);
+        generateShipwreckMonument(cx, waterHeight, cz, random);
     }
 
     public CompletableFuture<Void> preloadStarterIslandChunks(int cx, int cz) {
         World world = getAcidWorld();
-        int minChunkX = blockToChunk(cx - 12);
-        int maxChunkX = blockToChunk(cx + 12);
-        int minChunkZ = blockToChunk(cz - 8);
-        int maxChunkZ = blockToChunk(cz + 8);
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        int shipX = cx + config.getInt("starter-island.shipwreck-offset-x", 20);
+        int shipZ = cz + config.getInt("starter-island.shipwreck-offset-z", 17);
+        int minChunkX = blockToChunk(Math.min(cx - 12, shipX - 18));
+        int maxChunkX = blockToChunk(Math.max(cx + 12, shipX + 18));
+        int minChunkZ = blockToChunk(Math.min(cz - 8, shipZ - 10));
+        int maxChunkZ = blockToChunk(Math.max(cz + 8, shipZ + 10));
 
         List<CompletableFuture<Chunk>> chunkLoads = new ArrayList<>();
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
@@ -142,6 +145,17 @@ public class WorldManager {
 
     private int blockToChunk(int blockCoordinate) {
         return Math.floorDiv(blockCoordinate, 16);
+    }
+
+    public int getStarterIslandY() {
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        int waterHeight = config.getInt("acid-water.height", 62);
+        int offset = Math.max(1, config.getInt("starter-island.surface-offset-above-water", 2));
+        return waterHeight + offset;
+    }
+
+    public Location getStarterIslandHome(int cx, int cz) {
+        return new Location(getAcidWorld(), cx + 0.5, getStarterIslandY() + 1.0, cz - 2.5, 0.0f, 0.0f);
     }
 
     private void generateFallbackCrimsonFungus(int cx, int baseY, int cz) {
@@ -330,18 +344,20 @@ public class WorldManager {
         }
     }
 
-    private void generateMiniMonument(int cx, int cy, int cz) {
+    private void generateShipwreckMonument(int islandX, int waterHeight, int islandZ, Random random) {
         World world = getAcidWorld();
-        Random random = new Random((((long) cx) << 32) ^ cz ^ 0x5A17BEEF);
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        int cx = islandX + config.getInt("starter-island.shipwreck-offset-x", 20);
+        int cz = islandZ + config.getInt("starter-island.shipwreck-offset-z", 17);
+        int depth = Math.max(2, config.getInt("starter-island.shipwreck-depth-below-water", 5));
+        int cy = Math.max(world.getMinHeight() + 12, waterHeight - depth);
 
-        generateSunkenMonumentFoundation(world, cx, cy, cz);
-        generateBrokenGateway(world, cx - 7, cy + 1, cz - 4, true);
-        generateBrokenGateway(world, cx + 5, cy + 1, cz + 4, false);
-        generateBrokenGateway(world, cx - 5, cy + 1, cz + 5, false);
-        generateRuinedPillars(world, cx, cy, cz);
-        decorateMiniMonumentAltar(world, cx, cy, cz);
+        generateShipwreckHull(world, cx, cy, cz, waterHeight);
+        generateShipwreckMast(world, cx, cy, cz);
+        generateShipwreckCabin(world, cx, cy, cz);
+        decorateShipwreck(world, cx, cy, cz, waterHeight, random);
 
-        Location chestLoc = new Location(world, cx + 2, cy + 3, cz);
+        Location chestLoc = new Location(world, cx - 4, cy + 4, cz + 2);
         Block chestBlock = world.getBlockAt(chestLoc);
         chestBlock.setType(Material.CHEST, false);
         if (chestBlock.getState() instanceof Chest chest) {
@@ -367,109 +383,131 @@ public class WorldManager {
             }
         }
 
-        for (int i = 0; i < 22; i++) {
-            int x = cx - 10 + random.nextInt(21);
+        for (int i = 0; i < 24; i++) {
+            int x = cx - 15 + random.nextInt(31);
             int z = cz - 8 + random.nextInt(17);
-            int y = cy - 1 + random.nextInt(3);
-            if (random.nextDouble() < 0.68) {
-                setBlock(world, x, y, z, chooseRuinBlock(x, z));
+            int y = cy + random.nextInt(4);
+            Material wreckage = random.nextBoolean() ? Material.SPRUCE_PLANKS : Material.DARK_OAK_PLANKS;
+            if (random.nextDouble() < 0.72) {
+                setBlock(world, x, y, z, wreckage);
             } else {
-                placeSeaPickle(world, x, y + 1, z, 1 + random.nextInt(4));
+                placeSeaPickle(world, x, Math.min(waterHeight, y + 1), z, 1 + random.nextInt(4));
             }
         }
     }
 
-    private void generateSunkenMonumentFoundation(World world, int cx, int cy, int cz) {
-        for (int dx = -9; dx <= 9; dx++) {
-            for (int dz = -7; dz <= 7; dz++) {
-                double oval = (dx * dx) / 92.0 + (dz * dz) / 52.0;
-                boolean plaza = oval <= 1.0 && coordinateNoise(cx + dx, cz + dz, 91) > 0.08;
-                boolean causeway = Math.abs(dx) <= 1 && Math.abs(dz) <= 8;
-                boolean sideWalk = Math.abs(dz) <= 1 && dx >= -8 && dx <= 8;
-                boolean brokenCorner = Math.abs(dx) > 7 && Math.abs(dz) > 5 && coordinateNoise(cx + dx, cz + dz, 93) < 0.52;
-                if (!((plaza || causeway || sideWalk) && !brokenCorner)) {
+    private void generateShipwreckHull(World world, int cx, int cy, int cz, int waterHeight) {
+        for (int dx = -14; dx <= 14; dx++) {
+            double taper = 1.0 - Math.abs(dx) / 15.0;
+            int halfWidth = Math.max(1, (int) Math.round(2 + taper * 4));
+            for (int dz = -halfWidth; dz <= halfWidth; dz++) {
+                boolean side = Math.abs(dz) == halfWidth;
+                boolean innerSide = Math.abs(dz) == halfWidth - 1;
+                boolean broken = coordinateNoise(cx + dx, cz + dz, 121) < 0.09 && Math.abs(dx) > 3;
+                if (broken) {
                     continue;
                 }
 
-                Material base = chooseRuinBlock(cx + dx, cz + dz);
-                if ((Math.abs(dx) + Math.abs(dz)) % 7 == 0) {
-                    base = Material.DARK_PRISMARINE;
+                setBlock(world, cx + dx, cy, cz + dz, side ? Material.DARK_OAK_PLANKS : Material.SPRUCE_PLANKS);
+                if (side || innerSide) {
+                    setBlock(world, cx + dx, cy + 1, cz + dz, side ? Material.DARK_OAK_LOG : Material.SPRUCE_PLANKS);
+                    if (Math.abs(dx) < 11 && side) {
+                        setBlock(world, cx + dx, cy + 2, cz + dz, Material.DARK_OAK_PLANKS);
+                    }
+                } else if (Math.abs(dx) < 11 && coordinateNoise(cx + dx, cz + dz, 123) > 0.2) {
+                    setBlock(world, cx + dx, cy + 2, cz + dz, Material.SPRUCE_SLAB);
                 }
-                setBlock(world, cx + dx, cy - 1, cz + dz, Material.PRISMARINE);
-                setBlock(world, cx + dx, cy, cz + dz, base);
+            }
+        }
+
+        for (int dz = -2; dz <= 2; dz++) {
+            for (int dy = 1; dy <= 5; dy++) {
+                setBlock(world, cx - 15, cy + dy, cz + dz, dy > 3 ? Material.DARK_OAK_FENCE : Material.DARK_OAK_PLANKS);
+                setBlock(world, cx + 15, cy + dy, cz + dz, dy > 3 ? Material.SPRUCE_FENCE : Material.SPRUCE_PLANKS);
+            }
+        }
+
+        carveShipwreckBreach(world, cx - 7, cy + 1, cz - 3, waterHeight);
+        carveShipwreckBreach(world, cx + 6, cy + 1, cz + 4, waterHeight);
+    }
+
+    private void carveShipwreckBreach(World world, int x, int y, int z, int waterHeight) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = 0; dy <= 2; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    restoreFluidOrAir(world, x + dx, y + dy, z + dz, waterHeight);
+                }
             }
         }
     }
 
-    private void generateRuinedPillars(World world, int cx, int cy, int cz) {
-        int[][] pillars = {
-                {-7, -5, 5}, {-4, -6, 3}, {0, -5, 4}, {5, -4, 6}, {8, -1, 3},
-                {-8, 2, 4}, {-5, 5, 6}, {-1, 6, 3}, {4, 5, 5}, {7, 3, 4}
-        };
-        for (int[] pillar : pillars) {
-            int height = pillar[2];
-            for (int y = 1; y <= height; y++) {
-                Material material = y == height ? Material.SEA_LANTERN : (y % 3 == 0 ? Material.PRISMARINE_BRICKS : Material.PRISMARINE);
-                setBlock(world, cx + pillar[0], cy + y, cz + pillar[1], material);
+    private void generateShipwreckMast(World world, int cx, int cy, int cz) {
+        for (int y = cy + 2; y <= cy + 14; y++) {
+            setBlock(world, cx, y, cz, Material.SPRUCE_LOG);
+        }
+        for (int dz = -6; dz <= 6; dz++) {
+            setBlock(world, cx, cy + 11, cz + dz, Math.abs(dz) == 6 ? Material.SPRUCE_FENCE : Material.SPRUCE_LOG);
+        }
+        for (int dx = -2; dx <= 2; dx++) {
+            setBlock(world, cx + dx, cy + 8, cz, Material.DARK_OAK_FENCE);
+        }
+        for (int dz = -4; dz <= 4; dz++) {
+            if (Math.abs(dz) <= 1) {
+                continue;
             }
-            if (height >= 5) {
-                setBlock(world, cx + pillar[0] + 1, cy + height - 1, cz + pillar[1], Material.PRISMARINE_WALL);
-                setBlock(world, cx + pillar[0] - 1, cy + height - 2, cz + pillar[1], Material.DARK_PRISMARINE);
+            setBlock(world, cx + 1, cy + 10, cz + dz, Material.WHITE_WOOL);
+            if (Math.abs(dz) <= 3) {
+                setBlock(world, cx + 1, cy + 9, cz + dz, Material.WHITE_WOOL);
+            }
+        }
+        setBlock(world, cx, cy + 15, cz, Material.LANTERN);
+    }
+
+    private void generateShipwreckCabin(World world, int cx, int cy, int cz) {
+        for (int dx = 7; dx <= 11; dx++) {
+            for (int dz = -3; dz <= 3; dz++) {
+                boolean wall = dx == 7 || dx == 11 || Math.abs(dz) == 3;
+                if (wall) {
+                    setBlock(world, cx + dx, cy + 3, cz + dz, Material.STRIPPED_SPRUCE_LOG);
+                    setBlock(world, cx + dx, cy + 4, cz + dz, Material.SPRUCE_PLANKS);
+                } else {
+                    setBlock(world, cx + dx, cy + 3, cz + dz, Material.SPRUCE_SLAB);
+                }
+            }
+        }
+        for (int dx = 6; dx <= 12; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                if (Math.abs(dz) <= 4 && dx >= 7 && dx <= 11) {
+                    setBlock(world, cx + dx, cy + 5, cz + dz, Material.DARK_OAK_SLAB);
+                }
+            }
+        }
+        setBlock(world, cx + 9, cy + 4, cz - 3, Material.SEA_LANTERN);
+        setBlock(world, cx + 9, cy + 4, cz + 3, Material.SEA_LANTERN);
+    }
+
+    private void decorateShipwreck(World world, int cx, int cy, int cz, int waterHeight, Random random) {
+        setBlock(world, cx - 11, cy + 3, cz - 2, Material.BARREL);
+        setBlock(world, cx - 10, cy + 3, cz - 1, Material.BARREL);
+        setBlock(world, cx + 4, cy + 3, cz + 4, Material.SEA_LANTERN);
+        setBlock(world, cx - 5, cy + 3, cz - 5, Material.SEA_LANTERN);
+        setBlock(world, cx + 13, cy + 4, cz, Material.IRON_BARS);
+        setBlock(world, cx + 13, cy + 3, cz, Material.LANTERN);
+
+        for (int i = 0; i < 18; i++) {
+            int x = cx - 13 + random.nextInt(27);
+            int z = cz - 6 + random.nextInt(13);
+            int y = cy + 2 + random.nextInt(3);
+            if (random.nextDouble() < 0.5) {
+                setBlock(world, x, y, z, random.nextBoolean() ? Material.SPRUCE_FENCE : Material.DARK_OAK_FENCE);
+            } else {
+                placeSeaPickle(world, x, Math.min(waterHeight, y), z, 1 + random.nextInt(4));
             }
         }
     }
 
-    private void generateBrokenGateway(World world, int x, int y, int z, boolean tallSide) {
-        int leftHeight = tallSide ? 6 : 4;
-        int rightHeight = tallSide ? 4 : 6;
-        for (int dy = 1; dy <= leftHeight; dy++) {
-            setBlock(world, x, y + dy, z - 1, dy % 2 == 0 ? Material.DARK_PRISMARINE : Material.PRISMARINE_BRICKS);
-        }
-        for (int dy = 1; dy <= rightHeight; dy++) {
-            setBlock(world, x + 2, y + dy, z + 1, dy % 2 == 0 ? Material.PRISMARINE : Material.PRISMARINE_BRICKS);
-        }
-        int lintelY = y + Math.min(leftHeight, rightHeight) + 1;
-        setBlock(world, x, lintelY, z, Material.PRISMARINE_BRICKS);
-        setBlock(world, x + 1, lintelY, z, Material.DARK_PRISMARINE);
-        setBlock(world, x + 2, lintelY, z, Material.PRISMARINE_BRICKS);
-        setBlock(world, x + 1, lintelY - 1, z, Material.SEA_LANTERN);
-        setBlock(world, x - 1, y, z - 1, Material.DARK_PRISMARINE);
-        setBlock(world, x + 3, y, z + 1, Material.PRISMARINE);
-        setBlock(world, x + 1, y + 1, z, Material.PRISMARINE_WALL);
-    }
-
-    private void decorateMiniMonumentAltar(World world, int cx, int cy, int cz) {
-        int[][] plinth = {
-                {2, 0}, {1, 0}, {3, 0}, {2, -1}, {2, 1}, {1, -1}, {3, 1}
-        };
-        for (int i = 0; i < plinth.length; i++) {
-            int dx = plinth[i][0];
-            int dz = plinth[i][1];
-            Material material = i == 0 ? Material.DARK_PRISMARINE : i % 2 == 0 ? Material.PRISMARINE_BRICKS : Material.PRISMARINE;
-            setBlock(world, cx + dx, cy + 1, cz + dz, material);
-        }
-
-        setBlock(world, cx + 2, cy + 2, cz, Material.SEA_LANTERN);
-        setBlock(world, cx + 1, cy + 1, cz - 1, Material.SEA_LANTERN);
-        setBlock(world, cx + 3, cy + 1, cz + 1, Material.SEA_LANTERN);
-
-        int[][] lanternMarkers = {
-                {-4, -2, 2}, {0, 1, 1}, {4, 2, 2}
-        };
-        for (int[] marker : lanternMarkers) {
-            int x = cx + marker[0];
-            int z = cz + marker[1];
-            setBlock(world, x, cy + 1, z, Material.PRISMARINE_WALL);
-            if (marker[2] > 1) {
-                setBlock(world, x, cy + 2, z, Material.PRISMARINE_WALL);
-            }
-            setBlock(world, x, cy + marker[2] + 1, z, Material.SEA_LANTERN);
-        }
-
-        placeSeaPickle(world, cx - 5, cy + 1, cz - 3, 3);
-        placeSeaPickle(world, cx - 1, cy + 1, cz - 2, 2);
-        placeSeaPickle(world, cx + 5, cy + 1, cz + 3, 4);
-        placeSeaPickle(world, cx + 6, cy + 1, cz + 2, 1);
+    private void restoreFluidOrAir(World world, int x, int y, int z, int waterHeight) {
+        setBlock(world, x, y, z, y <= waterHeight ? Material.WATER : Material.AIR);
     }
 
     private void placeSeaPickle(World world, int x, int y, int z, int count) {
@@ -730,17 +768,6 @@ public class WorldManager {
             return palette.surfaceDetail();
         }
         return palette.surface();
-    }
-
-    private Material chooseRuinBlock(int x, int z) {
-        double noise = coordinateNoise(x, z, 67);
-        if (noise > 0.82) {
-            return Material.DARK_PRISMARINE;
-        }
-        if (noise > 0.52) {
-            return Material.PRISMARINE_BRICKS;
-        }
-        return Material.PRISMARINE;
     }
 
     private double coordinateNoise(int x, int z, int salt) {

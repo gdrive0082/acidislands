@@ -242,6 +242,7 @@ public class IslandManager {
         plugin.getWorldManager().generateStarterIsland(cx, cz, type);
 
         Island island = new Island(ownerUuid, cx, cz);
+        island.setHome(plugin.getWorldManager().getStarterIslandHome(cx, cz));
         island.setTheme(type);
         islandsByOwner.put(ownerUuid, island);
         indexIsland(island);
@@ -295,6 +296,7 @@ public class IslandManager {
                         plugin.getWorldManager().generateStarterIsland(cx, cz, type);
 
                         Island island = new Island(ownerUuid, cx, cz);
+                        island.setHome(plugin.getWorldManager().getStarterIslandHome(cx, cz));
                         island.setTheme(type);
                         islandsByOwner.put(ownerUuid, island);
                         indexIsland(island);

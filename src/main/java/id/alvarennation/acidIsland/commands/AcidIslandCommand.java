@@ -608,7 +608,8 @@ public class AcidIslandCommand implements CommandExecutor {
             memberNames.add((member.getName() == null ? uuid.toString() : member.getName()) + " (" + island.getRole(uuid).getDisplayName() + ")");
         }
         player.sendMessage(plugin.getConfigManager().format("&7Anggota: &e" + (memberNames.isEmpty() ? "-" : String.join(", ", memberNames))));
-        player.sendMessage(plugin.getConfigManager().format("&7Lokasi Center: &e" + island.getX() + ", Y=75, " + island.getZ()));
+        int islandY = plugin.getWorldManager().getStarterIslandY();
+        player.sendMessage(plugin.getConfigManager().format("&7Lokasi Center: &e" + island.getX() + ", Y=" + islandY + ", " + island.getZ()));
         player.sendMessage(plugin.getConfigManager().format("&7Tingkat Upgrade:"));
         player.sendMessage(plugin.getConfigManager().format("  &7- World Border: &eTier " + island.getLevel("border")));
         player.sendMessage(plugin.getConfigManager().format("  &7- Kapasitas Anggota: &eTier " + island.getLevel("members")));
