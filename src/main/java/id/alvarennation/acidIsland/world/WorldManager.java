@@ -6,6 +6,9 @@ import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Waterlogged;
+import org.bukkit.block.data.type.SeaPickle;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Entity;
@@ -130,8 +133,8 @@ public class WorldManager {
     }
 
     private void clearStarterAir(World world, int cx, int islandY, int cz, int waterHeight) {
-        for (int x = cx - 8; x <= cx + 8; x++) {
-            for (int z = cz - 7; z <= cz + 7; z++) {
+        for (int x = cx - 7; x <= cx + 7; x++) {
+            for (int z = cz - 6; z <= cz + 6; z++) {
                 for (int y = waterHeight + 1; y <= islandY + 11; y++) {
                     Block block = world.getBlockAt(x, y, z);
                     if (!block.getType().isAir()) {
@@ -143,8 +146,8 @@ public class WorldManager {
     }
 
     private void generateOrganicIslandBase(World world, int cx, int islandY, int cz, int waterHeight, StarterPalette palette) {
-        for (int dx = -7; dx <= 7; dx++) {
-            for (int dz = -6; dz <= 6; dz++) {
+        for (int dx = -6; dx <= 6; dx++) {
+            for (int dz = -5; dz <= 5; dz++) {
                 if (!isStarterIslandColumn(cx + dx, cz + dz, dx, dz)) {
                     continue;
                 }
@@ -168,8 +171,8 @@ public class WorldManager {
 
     private void generateNaturalSupports(World world, int cx, int islandY, int cz, int waterHeight, StarterPalette palette) {
         generateSupport(world, cx, islandY, cz, waterHeight, palette, 0, 0, 2);
-        generateSupport(world, cx, islandY, cz, waterHeight + 4, palette, -3, 2, 1);
-        generateSupport(world, cx, islandY, cz, waterHeight + 5, palette, 3, -2, 1);
+        generateSupport(world, cx, islandY, cz, waterHeight + 5, palette, -2, 2, 1);
+        generateSupport(world, cx, islandY, cz, waterHeight + 6, palette, 2, -2, 1);
     }
 
     private void generateSupport(World world, int cx, int islandY, int cz, int bottomY, StarterPalette palette, int offsetX, int offsetZ, int topRadius) {
@@ -205,9 +208,9 @@ public class WorldManager {
             }
         }
 
-        for (int i = 0; i < 16; i++) {
-            int dx = random.nextInt(13) - 6;
-            int dz = random.nextInt(11) - 5;
+        for (int i = 0; i < 14; i++) {
+            int dx = random.nextInt(11) - 5;
+            int dz = random.nextInt(9) - 4;
             if (!isStarterIslandColumn(cx + dx, cz + dz, dx, dz)) {
                 continue;
             }
@@ -222,11 +225,11 @@ public class WorldManager {
             setBlock(world, cx - 4, islandY + 1, cz + 1, Material.BASALT);
             setBlock(world, cx - 4, islandY + 2, cz + 1, Material.BASALT);
             setBlock(world, cx + 4, islandY + 1, cz - 2, Material.BLACKSTONE);
-            setBlock(world, cx - 2, islandY + 1, cz + 3, Material.SHROOMLIGHT);
+            setBlock(world, cx - 2, islandY + 1, cz + 2, Material.SHROOMLIGHT);
         } else {
-            setBlock(world, cx - 4, islandY + 1, cz + 2, Material.OAK_LOG);
-            setBlock(world, cx - 3, islandY + 1, cz + 3, Material.MOSS_BLOCK);
-            setBlock(world, cx + 4, islandY + 1, cz - 2, Material.MOSS_CARPET);
+            setBlock(world, cx - 3, islandY + 1, cz + 2, Material.OAK_LOG);
+            setBlock(world, cx - 2, islandY + 1, cz + 2, Material.MOSS_BLOCK);
+            setBlock(world, cx + 3, islandY + 1, cz - 2, Material.MOSS_CARPET);
         }
     }
 
@@ -328,9 +331,8 @@ public class WorldManager {
             setBlock(world, cx - 3 + i, cy + 2, cz + 2 + i / 2, Material.PRISMARINE_BRICKS);
         }
 
-        setBlock(world, cx + 2, cy + 1, cz, Material.DARK_PRISMARINE);
-        setBlock(world, cx + 2, cy + 2, cz, Material.SEA_LANTERN);
-        setBlock(world, cx + 1, cy + 1, cz - 1, Material.SEA_LANTERN);
+        decorateMiniMonumentAltar(world, cx, cy, cz);
+
         Location chestLoc = new Location(world, cx + 2, cy + 3, cz);
         Block chestBlock = world.getBlockAt(chestLoc);
         chestBlock.setType(Material.CHEST, false);
@@ -378,6 +380,59 @@ public class WorldManager {
         setBlock(world, x + 1, lintelY, z, Material.DARK_PRISMARINE);
         setBlock(world, x + 2, lintelY, z, Material.PRISMARINE_BRICKS);
         setBlock(world, x + 1, lintelY - 1, z, Material.SEA_LANTERN);
+        setBlock(world, x - 1, y, z - 1, Material.DARK_PRISMARINE);
+        setBlock(world, x + 3, y, z + 1, Material.PRISMARINE);
+        setBlock(world, x + 1, y + 1, z, Material.PRISMARINE_WALL);
+    }
+
+    private void decorateMiniMonumentAltar(World world, int cx, int cy, int cz) {
+        int[][] plinth = {
+                {2, 0}, {1, 0}, {3, 0}, {2, -1}, {2, 1}, {1, -1}, {3, 1}
+        };
+        for (int i = 0; i < plinth.length; i++) {
+            int dx = plinth[i][0];
+            int dz = plinth[i][1];
+            Material material = i == 0 ? Material.DARK_PRISMARINE : i % 2 == 0 ? Material.PRISMARINE_BRICKS : Material.PRISMARINE;
+            setBlock(world, cx + dx, cy + 1, cz + dz, material);
+        }
+
+        setBlock(world, cx + 2, cy + 2, cz, Material.SEA_LANTERN);
+        setBlock(world, cx + 1, cy + 1, cz - 1, Material.SEA_LANTERN);
+        setBlock(world, cx + 3, cy + 1, cz + 1, Material.SEA_LANTERN);
+
+        int[][] lanternMarkers = {
+                {-4, -2, 2}, {0, 1, 1}, {4, 2, 2}
+        };
+        for (int[] marker : lanternMarkers) {
+            int x = cx + marker[0];
+            int z = cz + marker[1];
+            setBlock(world, x, cy + 1, z, Material.PRISMARINE_WALL);
+            if (marker[2] > 1) {
+                setBlock(world, x, cy + 2, z, Material.PRISMARINE_WALL);
+            }
+            setBlock(world, x, cy + marker[2] + 1, z, Material.SEA_LANTERN);
+        }
+
+        placeSeaPickle(world, cx - 5, cy + 1, cz - 3, 3);
+        placeSeaPickle(world, cx - 1, cy + 1, cz - 2, 2);
+        placeSeaPickle(world, cx + 5, cy + 1, cz + 3, 4);
+        placeSeaPickle(world, cx + 6, cy + 1, cz + 2, 1);
+    }
+
+    private void placeSeaPickle(World world, int x, int y, int z, int count) {
+        Block block = world.getBlockAt(x, y, z);
+        if (!block.getType().isAir() && block.getType() != Material.WATER) {
+            return;
+        }
+        block.setType(Material.SEA_PICKLE, false);
+        BlockData data = block.getBlockData();
+        if (data instanceof SeaPickle seaPickle) {
+            seaPickle.setPickles(Math.max(1, Math.min(4, count)));
+        }
+        if (data instanceof Waterlogged waterlogged) {
+            waterlogged.setWaterlogged(true);
+        }
+        block.setBlockData(data, false);
     }
 
     /**
@@ -507,23 +562,25 @@ public class WorldManager {
     }
 
     private boolean isStarterIslandColumn(int worldX, int worldZ, int dx, int dz) {
-        boolean core = Math.abs(dx) <= 3 && Math.abs(dz) <= 3;
-        double oval = (dx * dx) / 36.0 + ((dz + 0.5) * (dz + 0.5)) / 25.0;
-        boolean cove = dx >= 4 && dz >= 1 && dz <= 4;
-        boolean beachTail = dx <= -4 && Math.abs(dz) <= 2;
-        boolean southPoint = dz >= 4 && Math.abs(dx + 1) <= 2;
-        boolean northBump = dz <= -4 && dx >= -2 && dx <= 3;
+        boolean core = Math.abs(dx) <= 2 && Math.abs(dz) <= 2;
+        boolean chestShelf = dx >= 2 && dx <= 3 && dz >= 1 && dz <= 2;
+        boolean leashShelf = dx >= -3 && dx <= -2 && dz >= -2 && dz <= -1;
+        double oval = (dx * dx) / 30.25 + ((dz + 0.35) * (dz + 0.35)) / 20.25;
+        boolean cove = dx >= 4 && dz >= 1 && dz <= 3;
+        boolean beachTail = dx <= -4 && Math.abs(dz) <= 1;
+        boolean southPoint = dz >= 4 && Math.abs(dx + 1) <= 1;
+        boolean northBump = dz <= -4 && dx >= -1 && dx <= 2;
         boolean candidate = oval <= 1.0 || beachTail || southPoint || northBump;
         double edgeBreak = coordinateNoise(worldX, worldZ, 11);
-        boolean protectedCenter = Math.abs(dx) <= 3 && Math.abs(dz) <= 3;
-        boolean naturalEdge = edgeBreak > 0.18 || oval < 0.72 || core;
-        return protectedCenter || candidate && !cove && naturalEdge;
+        boolean protectedCenter = core || chestShelf || leashShelf;
+        boolean naturalEdge = edgeBreak > 0.2 || oval < 0.68 || core;
+        return protectedCenter || (candidate && !cove && naturalEdge);
     }
 
     private int starterColumnDepth(int dx, int dz) {
-        int centerWeight = Math.max(0, 6 - (Math.abs(dx) + Math.abs(dz)));
-        int shore = Math.abs(dx) >= 5 || Math.abs(dz) >= 4 ? 0 : 1;
-        return 2 + Math.min(4, centerWeight / 2 + shore);
+        int centerWeight = Math.max(0, 5 - (Math.abs(dx) + Math.abs(dz)));
+        int shore = Math.abs(dx) >= 4 || Math.abs(dz) >= 4 ? 0 : 1;
+        return 2 + Math.min(3, centerWeight / 2 + shore);
     }
 
     private Material chooseSurfaceMaterial(int x, int z, StarterPalette palette) {
