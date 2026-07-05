@@ -1,15 +1,20 @@
 # ==========================================
 # AcidIsland Config File
-# Oceanfix4: lower shoreline island, distant shipwreck monument, safe cleanup shutdown.
+# Oceanfix5: world storage self-repair, lower shoreline island, distant shipwreck monument.
 # ==========================================
 
 # Versi template config.
-config-version: 12
+config-version: 13
 
 # Nama world tempat pulau AcidIsland dibuat.
 # acid-world adalah key aktif; world-name tetap dibaca sebagai fallback legacy.
 acid-world: "acid_island_world"
 world-name: "acid_island_world"
+
+# Guard untuk mencegah spam error save Paper jika folder world/data hilang saat server hidup.
+world-storage:
+  repair-missing-directories: true
+  repair-interval-ticks: 1200
 
 # Jarak antar pulau dalam block (agar border tidak bertubrukan)
 island-spacing: 400

@@ -40,6 +40,7 @@ public class WorldManager {
     private final IslandValueScanner islandValueScanner;
     private final Set<BukkitTask> cleanupTasks = ConcurrentHashMap.newKeySet();
     private final Set<BukkitTask> biomeTasks = ConcurrentHashMap.newKeySet();
+    private BukkitTask storageWatchdogTask;
     private volatile boolean shuttingDown = false;
 
     public WorldManager(AcidIsland plugin) {
@@ -49,6 +50,10 @@ public class WorldManager {
 
     public void shutdown() {
         shuttingDown = true;
+        if (storageWatchdogTask != null) {
+            storageWatchdogTask.cancel();
+            storageWatchdogTask = null;
+        }
         cancelScheduledWorldTasks();
         cancelIslandValueScans();
     }
@@ -57,13 +62,16 @@ public class WorldManager {
         String worldName = plugin.getConfigManager().getAcidWorldName();
         int waterHeight = plugin.getConfigManager().getConfig().getInt("acid-water.height", 62);
 
+        ensureWorldStorageDirectories(worldName);
+
         WorldCreator creator = new WorldCreator(worldName);
         creator.generator(new VoidWorldGenerator(waterHeight));
         creator.environment(World.Environment.NORMAL);
         
         this.acidWorld = creator.createWorld();
         if (this.acidWorld != null) {
-            ensureWorldDataDirectory(this.acidWorld);
+            ensureWorldStorageDirectories(this.acidWorld);
+            startStorageWatchdog();
             this.acidWorld.setStorm(false);
             this.acidWorld.setThundering(false);
             this.acidWorld.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, true);
@@ -74,15 +82,68 @@ public class WorldManager {
     public World getAcidWorld() {
         if (acidWorld == null) {
             initWorld();
+        } else {
+            ensureWorldStorageDirectories(acidWorld);
         }
         return acidWorld;
     }
 
-    private void ensureWorldDataDirectory(World world) {
-        File dataDirectory = new File(world.getWorldFolder(), "data");
-        if (!dataDirectory.exists() && !dataDirectory.mkdirs()) {
-            plugin.getLogger().warning("Could not create data folder for world " + world.getName() + ": " + dataDirectory.getPath());
+    private void startStorageWatchdog() {
+        if (!plugin.getConfigManager().getConfig().getBoolean("world-storage.repair-missing-directories", true)) {
+            return;
         }
+        if (storageWatchdogTask != null && !storageWatchdogTask.isCancelled()) {
+            return;
+        }
+        long interval = Math.max(100L, plugin.getConfigManager().getConfig().getLong("world-storage.repair-interval-ticks", 1200L));
+        storageWatchdogTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (shuttingDown || !plugin.isEnabled()) {
+                    cancel();
+                    return;
+                }
+                World world = acidWorld;
+                if (world != null) {
+                    ensureWorldStorageDirectories(world);
+                }
+            }
+        }.runTaskTimer(plugin, interval, interval);
+    }
+
+    private void ensureWorldStorageDirectories(String worldName) {
+        ensureWorldStorageDirectories(new File(Bukkit.getWorldContainer(), worldName), worldName);
+    }
+
+    private void ensureWorldStorageDirectories(World world) {
+        ensureWorldStorageDirectories(world.getWorldFolder(), world.getName());
+    }
+
+    private void ensureWorldStorageDirectories(File worldDirectory, String worldName) {
+        boolean repaired = false;
+        repaired |= ensureDirectory(worldDirectory, "world folder", worldName);
+        repaired |= ensureDirectory(new File(worldDirectory, "data"), "world data folder", worldName);
+        repaired |= ensureDirectory(new File(worldDirectory, "region"), "world region folder", worldName);
+        repaired |= ensureDirectory(new File(worldDirectory, "entities"), "world entities folder", worldName);
+        repaired |= ensureDirectory(new File(worldDirectory, "poi"), "world POI folder", worldName);
+        if (repaired) {
+            plugin.getLogger().warning("Repaired missing storage directories for world '" + worldName + "'. If this happened while the server was running, restore the world folder from backup to recover lost chunk files.");
+        }
+    }
+
+    private boolean ensureDirectory(File directory, String label, String worldName) {
+        if (directory.isDirectory()) {
+            return false;
+        }
+        if (directory.exists()) {
+            plugin.getLogger().severe("Cannot repair " + label + " for world '" + worldName + "' because path is not a directory: " + directory.getPath());
+            return false;
+        }
+        if (directory.mkdirs() || directory.isDirectory()) {
+            return true;
+        }
+        plugin.getLogger().severe("Could not create " + label + " for world '" + worldName + "': " + directory.getPath());
+        return false;
     }
 
     public void generateStarterIsland(int cx, int cz, String type) {
