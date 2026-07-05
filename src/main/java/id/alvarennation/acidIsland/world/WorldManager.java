@@ -130,8 +130,8 @@ public class WorldManager {
     }
 
     private void clearStarterAir(World world, int cx, int islandY, int cz, int waterHeight) {
-        for (int x = cx - 9; x <= cx + 9; x++) {
-            for (int z = cz - 9; z <= cz + 9; z++) {
+        for (int x = cx - 13; x <= cx + 13; x++) {
+            for (int z = cz - 10; z <= cz + 10; z++) {
                 for (int y = waterHeight + 1; y <= islandY + 11; y++) {
                     Block block = world.getBlockAt(x, y, z);
                     if (!block.getType().isAir()) {
@@ -143,14 +143,13 @@ public class WorldManager {
     }
 
     private void generateOrganicIslandBase(World world, int cx, int islandY, int cz, int waterHeight, StarterPalette palette) {
-        for (int dx = -8; dx <= 8; dx++) {
-            for (int dz = -7; dz <= 7; dz++) {
+        for (int dx = -12; dx <= 12; dx++) {
+            for (int dz = -9; dz <= 9; dz++) {
                 if (!isStarterIslandColumn(cx + dx, cz + dz, dx, dz)) {
                     continue;
                 }
 
-                double normalized = normalizedIslandDistance(dx, dz);
-                int depth = 2 + Math.max(0, (int) Math.round((1.0 - normalized) * 4.0));
+                int depth = starterColumnDepth(dx, dz);
                 if (coordinateNoise(cx + dx, cz + dz, 17) > 0.72) {
                     depth++;
                 }
@@ -168,9 +167,10 @@ public class WorldManager {
     }
 
     private void generateNaturalSupports(World world, int cx, int islandY, int cz, int waterHeight, StarterPalette palette) {
-        generateSupport(world, cx, islandY, cz, waterHeight, palette, 0, 0, 3);
-        generateSupport(world, cx, islandY, cz, waterHeight + 3, palette, -3, 2, 2);
-        generateSupport(world, cx, islandY, cz, waterHeight + 4, palette, 3, -2, 2);
+        generateSupport(world, cx, islandY, cz, waterHeight, palette, -1, 0, 3);
+        generateSupport(world, cx, islandY, cz, waterHeight + 3, palette, -5, 3, 2);
+        generateSupport(world, cx, islandY, cz, waterHeight + 4, palette, 5, -5, 2);
+        generateSupport(world, cx, islandY, cz, waterHeight + 6, palette, 8, 4, 1);
     }
 
     private void generateSupport(World world, int cx, int islandY, int cz, int bottomY, StarterPalette palette, int offsetX, int offsetZ, int topRadius) {
@@ -206,9 +206,11 @@ public class WorldManager {
             }
         }
 
-        for (int i = 0; i < 18; i++) {
-            int dx = random.nextInt(15) - 7;
-            int dz = random.nextInt(13) - 6;
+        generateBrokenWalkway(world, cx, islandY, cz, palette);
+
+        for (int i = 0; i < 24; i++) {
+            int dx = random.nextInt(23) - 11;
+            int dz = random.nextInt(17) - 8;
             if (!isStarterIslandColumn(cx + dx, cz + dz, dx, dz)) {
                 continue;
             }
@@ -228,6 +230,20 @@ public class WorldManager {
             setBlock(world, cx - 4, islandY + 1, cz + 2, Material.OAK_LOG);
             setBlock(world, cx - 3, islandY + 1, cz + 3, Material.MOSS_BLOCK);
             setBlock(world, cx + 4, islandY + 1, cz - 2, Material.MOSS_CARPET);
+        }
+    }
+
+    private void generateBrokenWalkway(World world, int cx, int islandY, int cz, StarterPalette palette) {
+        int[][] path = {
+                {3, 2}, {4, 2}, {5, 3}, {7, 3}, {8, 4}, {10, 4}
+        };
+        for (int i = 0; i < path.length; i++) {
+            int dx = path[i][0];
+            int dz = path[i][1];
+            setBlock(world, cx + dx, islandY, cz + dz, palette.bridge());
+            if (i % 2 == 0) {
+                setBlock(world, cx + dx, islandY - 1, cz + dz, palette.underside());
+            }
         }
     }
 
@@ -291,51 +307,48 @@ public class WorldManager {
         World world = getAcidWorld();
         Random random = new Random((((long) cx) << 32) ^ cz ^ 0x5A17BEEF);
 
-        for (int dx = -6; dx <= 6; dx++) {
-            for (int dz = -6; dz <= 6; dz++) {
-                double distance = Math.sqrt(dx * dx + dz * dz);
-                if (distance <= 5.4) {
-                    Material floor = distance <= 2.2 ? Material.DARK_PRISMARINE : chooseRuinBlock(cx + dx, cz + dz);
-                    setBlock(world, cx + dx, cy - 1, cz + dz, Material.PRISMARINE);
-                    setBlock(world, cx + dx, cy, cz + dz, floor);
+        int[][] spine = {
+                {-8, -4}, {-7, -4}, {-6, -3}, {-5, -3}, {-4, -2}, {-3, -2},
+                {-2, -1}, {-1, -1}, {0, 0}, {1, 0}, {2, 1}, {3, 1},
+                {4, 2}, {5, 2}, {6, 3}, {7, 3}
+        };
+        for (int i = 0; i < spine.length; i++) {
+            int dx = spine[i][0];
+            int dz = spine[i][1];
+            int width = i % 4 == 0 ? 2 : 1;
+            for (int ox = -width; ox <= width; ox++) {
+                for (int oz = -width; oz <= width; oz++) {
+                    if (Math.abs(ox) + Math.abs(oz) > width + 1) {
+                        continue;
+                    }
+                    Material floor = i % 5 == 0 ? Material.DARK_PRISMARINE : chooseRuinBlock(cx + dx + ox, cz + dz + oz);
+                    setBlock(world, cx + dx + ox, cy - 1, cz + dz + oz, Material.PRISMARINE);
+                    setBlock(world, cx + dx + ox, cy, cz + dz + oz, floor);
                 }
             }
         }
 
-        for (int dx = -5; dx <= 5; dx++) {
-            for (int dz = -5; dz <= 5; dz++) {
-                double distance = Math.sqrt(dx * dx + dz * dz);
-                boolean doorway = (Math.abs(dx) <= 1 && Math.abs(dz) >= 4) || (Math.abs(dz) <= 1 && Math.abs(dx) >= 4);
-                if (distance < 4.2 || distance > 5.5 || doorway) {
-                    continue;
-                }
-                int height = coordinateNoise(cx + dx, cz + dz, 91) > 0.36 ? 2 : 1;
-                for (int y = 1; y <= height; y++) {
-                    setBlock(world, cx + dx, cy + y, cz + dz, y == height ? Material.PRISMARINE_BRICKS : Material.PRISMARINE);
-                }
+        int[][] ribs = {
+                {-6, -5, 3}, {-5, -1, 2}, {-2, -3, 2}, {0, 2, 3}, {3, -1, 2}, {5, 4, 3}
+        };
+        for (int[] rib : ribs) {
+            int height = rib[2];
+            for (int y = 1; y <= height; y++) {
+                setBlock(world, cx + rib[0], cy + y, cz + rib[1], y == height ? Material.PRISMARINE_BRICKS : Material.PRISMARINE);
             }
         }
 
-        int[][] pillars = {{4, 4}, {-4, 4}, {4, -4}, {-4, -4}};
-        for (int[] pillar : pillars) {
-            for (int y = 1; y <= 5; y++) {
-                Material block = y % 2 == 0 ? Material.DARK_PRISMARINE : Material.PRISMARINE_BRICKS;
-                setBlock(world, cx + pillar[0], cy + y, cz + pillar[1], block);
-            }
-            setBlock(world, cx + pillar[0], cy + 6, cz + pillar[1], Material.SEA_LANTERN);
+        generateBrokenGateway(world, cx - 8, cy, cz - 4, true);
+        generateBrokenGateway(world, cx + 7, cy, cz + 3, false);
+
+        for (int i = 0; i < 5; i++) {
+            setBlock(world, cx - 3 + i, cy + 2, cz + 2 + i / 2, Material.PRISMARINE_BRICKS);
         }
 
-        for (int i = -2; i <= 2; i++) {
-            setBlock(world, cx + i, cy + 4, cz + 5, Material.PRISMARINE_BRICKS);
-            setBlock(world, cx + i, cy + 4, cz - 5, Material.PRISMARINE_BRICKS);
-            setBlock(world, cx + 5, cy + 4, cz + i, Material.PRISMARINE_BRICKS);
-            setBlock(world, cx - 5, cy + 4, cz + i, Material.PRISMARINE_BRICKS);
-        }
-
-        setBlock(world, cx, cy + 1, cz, Material.DARK_PRISMARINE);
-        setBlock(world, cx + 1, cy + 1, cz, Material.SEA_LANTERN);
-        setBlock(world, cx - 1, cy + 1, cz, Material.SEA_LANTERN);
-        Location chestLoc = new Location(world, cx, cy + 2, cz);
+        setBlock(world, cx + 2, cy + 1, cz, Material.DARK_PRISMARINE);
+        setBlock(world, cx + 2, cy + 2, cz, Material.SEA_LANTERN);
+        setBlock(world, cx + 1, cy + 1, cz - 1, Material.SEA_LANTERN);
+        Location chestLoc = new Location(world, cx + 2, cy + 3, cz);
         Block chestBlock = world.getBlockAt(chestLoc);
         chestBlock.setType(Material.CHEST, false);
         if (chestBlock.getState() instanceof Chest chest) {
@@ -362,12 +375,26 @@ public class WorldManager {
         }
 
         for (int i = 0; i < 12; i++) {
-            double angle = random.nextDouble() * Math.PI * 2.0;
-            int radius = 6 + random.nextInt(4);
-            int x = cx + (int) Math.round(Math.cos(angle) * radius);
-            int z = cz + (int) Math.round(Math.sin(angle) * radius);
+            int x = cx - 9 + random.nextInt(19);
+            int z = cz - 6 + random.nextInt(13);
             setBlock(world, x, cy - 1 + random.nextInt(2), z, chooseRuinBlock(x, z));
         }
+    }
+
+    private void generateBrokenGateway(World world, int x, int y, int z, boolean tallSide) {
+        int leftHeight = tallSide ? 6 : 4;
+        int rightHeight = tallSide ? 4 : 6;
+        for (int dy = 1; dy <= leftHeight; dy++) {
+            setBlock(world, x, y + dy, z - 1, dy % 2 == 0 ? Material.DARK_PRISMARINE : Material.PRISMARINE_BRICKS);
+        }
+        for (int dy = 1; dy <= rightHeight; dy++) {
+            setBlock(world, x + 2, y + dy, z + 1, dy % 2 == 0 ? Material.PRISMARINE : Material.PRISMARINE_BRICKS);
+        }
+        int lintelY = y + Math.min(leftHeight, rightHeight) + 1;
+        setBlock(world, x, lintelY, z, Material.PRISMARINE_BRICKS);
+        setBlock(world, x + 1, lintelY, z, Material.DARK_PRISMARINE);
+        setBlock(world, x + 2, lintelY, z, Material.PRISMARINE_BRICKS);
+        setBlock(world, x + 1, lintelY - 1, z, Material.SEA_LANTERN);
     }
 
     /**
@@ -497,14 +524,23 @@ public class WorldManager {
     }
 
     private boolean isStarterIslandColumn(int worldX, int worldZ, int dx, int dz) {
-        double normalized = normalizedIslandDistance(dx, dz);
-        double wobble = (coordinateNoise(worldX, worldZ, 11) - 0.5) * 0.28;
+        boolean mainPlate = Math.abs(dx + dz / 2) + Math.abs(dz) <= 8 && dx <= 4;
+        boolean westFang = dx >= -11 && dx <= -6 && dz >= -2 && dz <= 2;
+        boolean northFang = dx >= -3 && dx <= 5 && dz >= -8 && dz <= -4 && Math.abs(dx - 1) + Math.abs(dz + 6) <= 5;
+        boolean eastShard = dx >= 6 && dx <= 11 && dz >= 2 && dz <= 6 && Math.abs(dx - 8) + Math.abs(dz - 4) <= 5;
+        boolean southShard = dx >= -2 && dx <= 5 && dz >= 5 && dz <= 8 && Math.abs(dx - 1) + Math.abs(dz - 6) <= 4;
+        boolean bite = dx >= 2 && dx <= 6 && dz >= -1 && dz <= 3;
+        boolean candidate = (mainPlate || westFang || northFang || eastShard || southShard) && !bite;
+        double edgeBreak = coordinateNoise(worldX, worldZ, 11);
         boolean protectedCenter = Math.abs(dx) <= 3 && Math.abs(dz) <= 3;
-        return protectedCenter || normalized + wobble <= 1.0;
+        boolean jaggedEdge = edgeBreak > 0.12 || (Math.abs(dx) <= 5 && Math.abs(dz) <= 5);
+        return protectedCenter || candidate && jaggedEdge;
     }
 
-    private double normalizedIslandDistance(int dx, int dz) {
-        return (dx * dx) / 56.25 + (dz * dz) / 36.0;
+    private int starterColumnDepth(int dx, int dz) {
+        int centerWeight = Math.max(0, 7 - (Math.abs(dx) + Math.abs(dz)));
+        int shardWeight = (Math.abs(dx) > 6 || Math.abs(dz) > 5) ? 0 : 1;
+        return 2 + Math.min(5, centerWeight / 2 + shardWeight);
     }
 
     private Material chooseSurfaceMaterial(int x, int z, StarterPalette palette) {
@@ -594,6 +630,7 @@ public class WorldManager {
             Material subsurface,
             Material underside,
             Material fence,
+            Material bridge,
             TreeType treeType,
             boolean nether
     ) {
@@ -606,6 +643,7 @@ public class WorldManager {
                         Material.SANDSTONE,
                         Material.CUT_SANDSTONE,
                         Material.ACACIA_FENCE,
+                        Material.ACACIA_PLANKS,
                         TreeType.ACACIA,
                         false
                 );
@@ -616,6 +654,7 @@ public class WorldManager {
                         Material.NETHERRACK,
                         Material.BASALT,
                         Material.NETHER_BRICK_FENCE,
+                        Material.CRIMSON_PLANKS,
                         TreeType.CRIMSON_FUNGUS,
                         true
                 );
@@ -626,6 +665,7 @@ public class WorldManager {
                         Material.DIRT,
                         Material.ROOTED_DIRT,
                         Material.OAK_FENCE,
+                        Material.OAK_PLANKS,
                         TreeType.TREE,
                         false
                 );
