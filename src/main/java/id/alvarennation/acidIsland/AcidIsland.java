@@ -70,7 +70,7 @@ public final class AcidIsland extends JavaPlugin {
         // 6. Register Commands
         if (getCommand("ai") != null) {
             getCommand("ai").setExecutor(new AcidIslandCommand(this));
-            getCommand("ai").setTabCompleter( new AcidIslandTabCompleter(this));
+            getCommand("ai").setTabCompleter(new AcidIslandTabCompleter(this));
         } else {
             getLogger().severe("Command /ai is not registered. Check plugin.yml commands section.");
         }

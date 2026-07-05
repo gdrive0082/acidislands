@@ -12,22 +12,12 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
 
 public class AcidIslandTabCompleter implements TabCompleter {
 
     private final AcidIsland plugin;
-
-    private static final List<String> SUBCOMMANDS = Arrays.asList(
-            "help", "start", "home", "sethome", "setting", "upgrade",
-            "vault", "bank", "invite", "accept", "reject", "kick",
-            "leave", "delete", "lobby", "info", "quest", "level",
-            "story", "top", "theme", "role", "setlobby", "reload", "admin"
-    );
 
     public AcidIslandTabCompleter(AcidIsland plugin) {
         this.plugin = plugin;
@@ -39,37 +29,41 @@ public class AcidIslandTabCompleter implements TabCompleter {
             return filter(getVisibleSubcommands(sender), args[0]);
         }
 
-        String sub = args[0].toLowerCase(Locale.ROOT);
+        String sub = AcidIslandCommandSpec.normalize(args[0]);
+        if (AcidIslandCommandSpec.isAdminOnly(sub) && !hasAdminPermission(sender)) {
+            return List.of();
+        }
+
         if (args.length == 2) {
             return switch (sub) {
                 case "invite" -> onlinePlayerNames(sender, args[1]);
                 case "kick", "role" -> islandMemberNames(sender, args[1]);
-                case "bank" -> filter(List.of("deposit", "withdraw"), args[1]);
+                case "bank" -> filter(AcidIslandCommandSpec.BANK_ACTIONS, args[1]);
                 case "accept" -> filter(List.of("confirm"), args[1]);
-                case "quest", "quests" -> filter(List.of("claim"), args[1]);
-                case "level" -> filter(List.of("refresh"), args[1]);
-                case "story" -> filter(List.of("start"), args[1]);
-                case "theme", "themes", "biome" -> filter(getThemeIds(), args[1]);
-                case "admin" -> filter(List.of("delete", "reset", "tp", "story"), args[1]);
-                default -> new ArrayList<>();
+                case "quest" -> filter(AcidIslandCommandSpec.QUEST_ACTIONS, args[1]);
+                case "level" -> filter(AcidIslandCommandSpec.LEVEL_ACTIONS, args[1]);
+                case "story" -> filter(AcidIslandCommandSpec.STORY_ACTIONS, args[1]);
+                case "theme" -> filter(getThemeIds(), args[1]);
+                case "admin" -> filter(AcidIslandCommandSpec.ADMIN_ACTIONS, args[1]);
+                default -> List.of();
             };
         }
 
         if (args.length == 3) {
             if (sub.equals("bank") && (args[1].equalsIgnoreCase("deposit") || args[1].equalsIgnoreCase("withdraw"))) {
-                return filter(List.of("100", "1000", "5000", "10000"), args[2]);
+                return filter(AcidIslandCommandSpec.BANK_AMOUNTS, args[2]);
             }
-            if (sub.equals("quest") || sub.equals("quests")) {
-                return args[1].equalsIgnoreCase("claim") ? filter(plugin.getQuestManager().getQuestIds(), args[2]) : new ArrayList<>();
+            if (sub.equals("quest")) {
+                return args[1].equalsIgnoreCase("claim") ? filter(plugin.getQuestManager().getQuestIds(), args[2]) : List.of();
             }
             if (sub.equals("story")) {
-                return args[1].equalsIgnoreCase("start") ? filter(getStoryConversationIds(), args[2]) : new ArrayList<>();
+                return args[1].equalsIgnoreCase("start") ? filter(getStoryConversationIds(), args[2]) : List.of();
             }
-            if (sub.equals("role") || sub.equals("roles")) {
-                return filter(List.of("member", "trusted", "co_owner"), args[2]);
+            if (sub.equals("role")) {
+                return filter(AcidIslandCommandSpec.ROLE_NAMES, args[2]);
             }
             if (sub.equals("admin") && args[1].equalsIgnoreCase("story")) {
-                return filter(List.of("set", "get", "add"), args[2]);
+                return filter(AcidIslandCommandSpec.ADMIN_STORY_ACTIONS, args[2]);
             }
             if (sub.equals("admin")) {
                 return onlinePlayerNames(sender, args[2]);
@@ -82,10 +76,10 @@ public class AcidIslandTabCompleter implements TabCompleter {
 
         if (args.length == 5 && sub.equals("admin") && args[1].equalsIgnoreCase("story")
                 && (args[2].equalsIgnoreCase("set") || args[2].equalsIgnoreCase("add"))) {
-            return filter(List.of("0", "1", "2", "3", "4", "5"), args[4]);
+            return filter(AcidIslandCommandSpec.STORY_STAGE_SAMPLES, args[4]);
         }
 
-        return new ArrayList<>();
+        return List.of();
     }
 
     private List<String> onlinePlayerNames(CommandSender sender, String input) {
@@ -93,16 +87,16 @@ public class AcidIslandTabCompleter implements TabCompleter {
                 .map(Player::getName)
                 .filter(name -> !(sender instanceof Player player) || !name.equals(player.getName()))
                 .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(input.toLowerCase(Locale.ROOT)))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private List<String> islandMemberNames(CommandSender sender, String input) {
         if (!(sender instanceof Player player)) {
-            return new ArrayList<>();
+            return List.of();
         }
         Island island = plugin.getIslandManager().getIslandByPlayer(player.getUniqueId());
         if (island == null) {
-            return new ArrayList<>();
+            return List.of();
         }
 
         return island.getMembers().stream()
@@ -115,46 +109,45 @@ public class AcidIslandTabCompleter implements TabCompleter {
                     return offline.getName() == null ? uuid.toString() : offline.getName();
                 })
                 .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(input.toLowerCase(Locale.ROOT)))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private List<String> getVisibleSubcommands(CommandSender sender) {
-        if (!(sender instanceof Player player) || player.hasPermission("acidisland.admin")) {
-            return SUBCOMMANDS;
+        if (hasAdminPermission(sender)) {
+            return AcidIslandCommandSpec.ALL_SUBCOMMANDS;
         }
-        return SUBCOMMANDS.stream()
-                .filter(sub -> !sub.equals("setlobby") && !sub.equals("reload") && !sub.equals("admin"))
-                .collect(Collectors.toList());
+        return AcidIslandCommandSpec.PLAYER_SUBCOMMANDS;
     }
 
     private List<String> getThemeIds() {
         ConfigurationSection section = plugin.getConfigManager().getConfig().getConfigurationSection("themes");
-        List<String> ids = new ArrayList<>();
         if (section == null) {
-            return ids;
+            return List.of();
         }
-        for (String key : section.getKeys(false)) {
-            if (section.getConfigurationSection(key) != null) {
-                ids.add(key);
-            }
-        }
-        return ids;
+        return section.getKeys(false).stream()
+                .filter(key -> section.getConfigurationSection(key) != null)
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
     }
 
     private List<String> getStoryConversationIds() {
         ConfigurationSection section = plugin.getConfigManager().getConfig().getConfigurationSection("integrations.conversecraft.story-stage-conversations");
-        List<String> ids = new ArrayList<>();
         if (section == null) {
-            return ids;
+            return List.of();
         }
-        ids.addAll(section.getKeys(false));
-        return ids;
+        return section.getKeys(false).stream()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
     }
 
     private List<String> filter(List<String> values, String input) {
         String lower = input.toLowerCase(Locale.ROOT);
         return values.stream()
                 .filter(value -> value.toLowerCase(Locale.ROOT).startsWith(lower))
-                .collect(Collectors.toList());
+                .toList();
+    }
+
+    private boolean hasAdminPermission(CommandSender sender) {
+        return !(sender instanceof Player) || sender.hasPermission("acidisland.admin");
     }
 }

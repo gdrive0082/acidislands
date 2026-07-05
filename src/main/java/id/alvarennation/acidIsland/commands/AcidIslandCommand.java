@@ -32,12 +32,12 @@ public class AcidIslandCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+        String sub = args.length == 0 ? "help" : AcidIslandCommandSpec.normalize(args[0]);
+        if (sub.equals("help")) {
             sendHelp(sender, label);
             return true;
         }
 
-        String sub = args[0].toLowerCase(Locale.ROOT);
         if (sub.equals("reload")) {
             handleReload(sender);
             return true;
@@ -83,13 +83,13 @@ public class AcidIslandCommand implements CommandExecutor {
             }
             case "home" -> teleportHome(player);
             case "sethome" -> handleSetHome(player);
-            case "setting", "settings" -> {
+            case "settings" -> {
                 Island island = requireIsland(player);
                 if (island != null) {
                     plugin.getIslandGUI().openSettingsCategoryGUI(player, island);
                 }
             }
-            case "upgrade", "upgrades" -> {
+            case "upgrade" -> {
                 Island island = requireIsland(player);
                 if (island != null) {
                     plugin.getIslandGUI().openUpgradesGUI(player, island);
@@ -121,11 +121,11 @@ public class AcidIslandCommand implements CommandExecutor {
             case "leave" -> handleLeave(player);
             case "delete" -> handleDelete(player);
             case "info" -> handleInfo(player);
-            case "quest", "quests" -> handleQuestCommand(player, args);
+            case "quest" -> handleQuestCommand(player, args);
             case "level" -> handleLevel(player, args);
             case "story" -> handleStoryCommand(player, args, label);
-            case "role", "roles" -> handleRoleCommand(player, args, label);
-            case "biome", "theme", "themes" -> handleThemeCommand(player, args);
+            case "role" -> handleRoleCommand(player, args, label);
+            case "theme" -> handleThemeCommand(player, args);
             default -> sendHelp(player, label);
         }
 
@@ -793,15 +793,10 @@ public class AcidIslandCommand implements CommandExecutor {
         if (player.hasPermission("acidisland.admin")) {
             return true;
         }
-        String normalized = switch (sub) {
-            case "setting" -> "settings";
-            case "upgrades" -> "upgrade";
-            case "quests" -> "quest";
-            case "themes", "biome" -> "theme";
-            case "roles" -> "role";
-            default -> sub;
-        };
-        return player.hasPermission("acidisland.command." + normalized);
+        if (AcidIslandCommandSpec.isAdminOnly(sub)) {
+            return false;
+        }
+        return player.hasPermission(AcidIslandCommandSpec.permissionNode(sub));
     }
 
     private boolean hasAdminPermission(CommandSender sender) {
@@ -820,24 +815,13 @@ public class AcidIslandCommand implements CommandExecutor {
 
     private void sendHelp(CommandSender sender, String label) {
         sender.sendMessage("§b=== §9§lAcidIsland Help §b===");
-        sender.sendMessage("§e/" + label + " start §7- Membuat pulau baru atau teleport ke rumah.");
-        sender.sendMessage("§e/" + label + " home §7- Teleportasi ke rumah pulau.");
-        sender.sendMessage("§e/" + label + " sethome §7- Mengatur lokasi home pulau.");
-        sender.sendMessage("§e/" + label + " info §7- Menampilkan informasi detail pulau.");
-        sender.sendMessage("§e/" + label + " setting §7- Mengubah pengaturan pulau.");
-        sender.sendMessage("§e/" + label + " upgrade §7- Upgrade kemampuan pulau.");
-        sender.sendMessage("§e/" + label + " vault §7- Membuka virtual chest.");
-        sender.sendMessage("§e/" + label + " bank §7- Deposit/withdraw bank pulau.");
-        sender.sendMessage("§e/" + label + " quest §7- Membuka quest pulau.");
-        sender.sendMessage("§e/" + label + " level [refresh] §7- Cek level/value island.");
-        sender.sendMessage("§e/" + label + " story [start <conversation>] §7- Cek/mulai story ConverseCraft.");
-        sender.sendMessage("§e/" + label + " top §7- Leaderboard island.");
-        sender.sendMessage("§e/" + label + " theme §7- Ganti biome/theme island.");
-        sender.sendMessage("§e/" + label + " role <player> <role> §7- Atur role member.");
-        sender.sendMessage("§e/" + label + " invite/kick/leave/delete/lobby §7- Manajemen island.");
+        for (String line : AcidIslandCommandSpec.HELP_LINES) {
+            sender.sendMessage("§e/" + label + " " + line);
+        }
         if (hasAdminPermission(sender)) {
-            sender.sendMessage("§c/" + label + " setlobby, reload, admin <delete|reset|tp> <player>");
-            sender.sendMessage("§c/" + label + " admin story <set|get|add> <player> [stage]");
+            for (String line : AcidIslandCommandSpec.ADMIN_HELP_LINES) {
+                sender.sendMessage("§c/" + label + " " + line);
+            }
         }
     }
 }
