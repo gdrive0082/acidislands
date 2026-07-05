@@ -62,6 +62,7 @@ public class WorldManager {
     public void generateStarterIsland(int cx, int cz, String type) {
         World world = getAcidWorld();
         int islandY = 75; // Ketinggian pulau starter
+        int waterHeight = plugin.getConfigManager().getConfig().getInt("acid-water.height", 62);
 
         Material surfaceMat = Material.GRASS_BLOCK;
         Material subMat = Material.DIRT;
@@ -92,13 +93,13 @@ public class WorldManager {
             }
         }
 
-        // 2. Tiang penyangga di tengah bawah sampai water level (Y=62)
-        for (int y = islandY - 3; y >= 62; y--) {
+        // 2. Tiang penyangga di tengah bawah sampai water level
+        for (int y = islandY - 3; y >= waterHeight; y--) {
             world.getBlockAt(cx, y, cz).setType(subMat);
         }
 
-        // 3. Bedrock di bawah tengah (Y=61)
-        world.getBlockAt(cx, 61, cz).setType(Material.BEDROCK);
+        // 3. Bedrock penanda tepat di bawah water level
+        world.getBlockAt(cx, waterHeight - 1, cz).setType(Material.BEDROCK);
 
         // 4. Generate Tree di tengah (Y=76)
         if (netherStarter) {
