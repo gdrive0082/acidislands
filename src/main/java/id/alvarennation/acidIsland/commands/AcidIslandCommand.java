@@ -32,7 +32,24 @@ public class AcidIslandCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        String sub = args.length == 0 ? "help" : AcidIslandCommandSpec.normalize(args[0]);
+        if (args.length == 0) {
+            if (sender instanceof Player player) {
+                plugin.getIslandGUI().openMainMenu(player);
+            } else {
+                sendHelp(sender, label);
+            }
+            return true;
+        }
+
+        String sub = AcidIslandCommandSpec.normalize(args[0]);
+        if (sub.equals("menu") || sub.equals("gui")) {
+            if (sender instanceof Player player) {
+                plugin.getIslandGUI().openMainMenu(player);
+            } else {
+                sendHelp(sender, label);
+            }
+            return true;
+        }
         if (sub.equals("help")) {
             sendHelp(sender, label);
             return true;
@@ -160,6 +177,14 @@ public class AcidIslandCommand implements CommandExecutor {
     private void handleAdmin(CommandSender sender, String[] args, String label) {
         if (!hasAdminPermission(sender)) {
             sender.sendMessage("§cKamu tidak punya izin untuk melakukan ini!");
+            return;
+        }
+        if (args.length == 1 || (args.length == 2 && (args[1].equalsIgnoreCase("menu") || args[1].equalsIgnoreCase("gui")))) {
+            if (sender instanceof Player player) {
+                plugin.getIslandGUI().openAdminMenu(player);
+            } else {
+                sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp> <player> atau /" + label + " admin story <set|get|add> <player> [stage]");
+            }
             return;
         }
         if (args.length >= 2 && args[1].equalsIgnoreCase("story")) {

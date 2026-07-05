@@ -3,6 +3,7 @@ package id.alvarennation.acidIsland.gui;
 import id.alvarennation.acidIsland.AcidIsland;
 import id.alvarennation.acidIsland.hooks.VaultHook;
 import id.alvarennation.acidIsland.island.Island;
+import id.alvarennation.acidIsland.island.IslandRole;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -25,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 import net.milkbowl.vault.economy.EconomyResponse;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -43,10 +45,18 @@ public class IslandGUI implements Listener {
     public static class AcidIslandHolder implements InventoryHolder {
         private final String guiType;
         private final Island island;
+        private final String context;
+        private final int page;
 
         public AcidIslandHolder(String guiType, Island island) {
+            this(guiType, island, "", 0);
+        }
+
+        public AcidIslandHolder(String guiType, Island island, String context, int page) {
             this.guiType = guiType;
             this.island = island;
+            this.context = context == null ? "" : context;
+            this.page = Math.max(0, page);
         }
 
         @Override
@@ -60,6 +70,14 @@ public class IslandGUI implements Listener {
 
         public Island getIsland() {
             return island;
+        }
+
+        public String getContext() {
+            return context;
+        }
+
+        public int getPage() {
+            return page;
         }
     }
 
@@ -83,6 +101,310 @@ public class IslandGUI implements Listener {
                 inv.setItem(i, filler);
             }
         }
+    }
+
+    // ==========================================
+    // 0. Main Dashboard GUI
+    // ==========================================
+    public void openMainMenu(Player player) {
+        Island island = plugin.getIslandManager().getIslandByPlayer(player.getUniqueId());
+        if (island == null) {
+            Inventory inv = Bukkit.createInventory(new AcidIslandHolder("main", null), 27, plugin.getConfigManager().format("&3&lAcidIsland Menu"));
+            inv.setItem(4, createGuiItem(
+                    Material.OAK_SAPLING,
+                    "&a&lMulai AcidIsland",
+                    "&7Kamu belum punya island.",
+                    "&7Pilih starter island untuk mulai."
+            ));
+            inv.setItem(11, createGuiItem(Material.GRASS_BLOCK, "&aBuat Island", "&7Buka pilihan starter island.", "&eKlik untuk mulai."));
+            inv.setItem(13, createGuiItem(Material.NETHER_STAR, "&bTop Island", "&7Lihat ranking island terbaik.", "&eKlik untuk membuka leaderboard."));
+            inv.setItem(15, createGuiItem(Material.ENDER_PEARL, "&eKe Lobby", "&7Teleport ke lobby AcidIsland.", "&eKlik untuk teleport."));
+            if (player.hasPermission("acidisland.admin")) {
+                inv.setItem(22, createGuiItem(Material.COMMAND_BLOCK, "&cAdmin Panel", "&7Buka dashboard admin.", "&eKlik untuk membuka."));
+            }
+            fillFiller(inv);
+            player.openInventory(inv);
+            return;
+        }
+
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("main", island), 45, plugin.getConfigManager().format("&3&lAcidIsland Dashboard"));
+        OfflinePlayer owner = Bukkit.getOfflinePlayer(island.getOwner());
+        int islandLevel = plugin.getIslandManager().getIslandLevel(island, false);
+        long value = plugin.getIslandManager().getIslandValue(island, false, false);
+        int storyStage = plugin.getIslandManager().getIslandStoryStage(island);
+        int borderSize = plugin.getIslandManager().getBorderSize(island);
+        IslandRole role = island.getRole(player.getUniqueId());
+
+        inv.setItem(4, createGuiItem(
+                Material.FILLED_MAP,
+                "&b&lRingkasan Island",
+                "&7Owner: &e" + getOfflineName(owner),
+                "&7Role kamu: &e" + role.getDisplayName(),
+                "&7Theme: &e" + island.getTheme(),
+                "&7Level: &a" + islandLevel + " &7(Value &a" + value + "&7)",
+                "&7Story Stage: &d" + storyStage,
+                "&7Border: &b" + borderSize + "x" + borderSize,
+                "&7Bank: &6" + formatMoney(island.getBankBalance()),
+                island.isLevelScanInProgress() ? "&eValue sedang dihitung ulang." : "&7Value memakai cache terbaru."
+        ));
+
+        inv.setItem(10, createGuiItem(Material.ENDER_PEARL, "&aHome", "&7Teleport ke home island.", "&eKlik untuk teleport."));
+        inv.setItem(11, createGuiItem(Material.COMPASS, "&eSet Home", "&7Atur home island di lokasi kamu.", island.canManage(player.getUniqueId()) ? "&eKlik untuk set home." : "&cButuh role Co-Owner."));
+        inv.setItem(12, createGuiItem(Material.REPEATER, "&9Settings", "&7Atur proteksi, visitor, dan premium setting.", "&eKlik untuk membuka."));
+        inv.setItem(13, createGuiItem(Material.ANVIL, "&6Upgrades", "&7Upgrade border, member, vault, bank, minion, generator.", "&eKlik untuk membuka."));
+        inv.setItem(14, createGuiItem(Material.CHEST, "&6Vault", "&7Storage bersama island.", "&eKlik untuk membuka."));
+        inv.setItem(15, createGuiItem(Material.GOLD_INGOT, "&eBank", "&7Deposit/withdraw saldo island via GUI.", "&eKlik untuk membuka."));
+        inv.setItem(16, createGuiItem(Material.WRITABLE_BOOK, "&aQuests", "&7Lihat dan claim quest island.", "&eKlik untuk membuka."));
+
+        inv.setItem(20, createGuiItem(Material.GRASS_BLOCK, "&bThemes", "&7Ubah biome/theme island.", island.canManage(player.getUniqueId()) ? "&eKlik untuk membuka." : "&cButuh role Co-Owner."));
+        inv.setItem(21, createGuiItem(Material.AMETHYST_SHARD, "&dStory", "&7Lihat stage dan mulai chapter ConverseCraft.", "&eKlik untuk membuka."));
+        inv.setItem(22, createGuiItem(Material.NETHER_STAR, "&bTop Island", "&7Lihat ranking island terbaik.", "&eKlik untuk membuka."));
+        inv.setItem(23, createGuiItem(Material.BELL, "&eLobby", "&7Teleport ke lobby AcidIsland.", "&eKlik untuk teleport."));
+        inv.setItem(24, createGuiItem(
+                island.isOwner(player.getUniqueId()) ? Material.TNT : Material.BARRIER,
+                "&cHapus Island",
+                island.isOwner(player.getUniqueId()) ? "&7Buka konfirmasi hapus island." : "&cHanya owner bisa menghapus island.",
+                island.isOwner(player.getUniqueId()) ? "&eKlik untuk konfirmasi." : "&7Gunakan /ai leave untuk keluar."
+        ));
+
+        inv.setItem(31, createGuiItem(Material.EXPERIENCE_BOTTLE, "&aRefresh Level", "&7Jadwalkan hitung ulang value island.", island.canManage(player.getUniqueId()) ? "&eKlik untuk scan ulang." : "&cButuh role Co-Owner."));
+        if (player.hasPermission("acidisland.admin")) {
+            inv.setItem(40, createGuiItem(Material.COMMAND_BLOCK, "&cAdmin Panel", "&7Buka dashboard admin.", "&eKlik untuk membuka."));
+        }
+
+        fillFiller(inv);
+        player.openInventory(inv);
+    }
+
+    public void openBankGUI(Player player, Island island) {
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("bank", island), 36, plugin.getConfigManager().format("&6&lIsland Bank"));
+        double limit = getBankLimit(island);
+        String limitText = limit < 0 ? "Tanpa Batas" : formatMoney(limit);
+        String wallet = VaultHook.hasEconomy() ? formatMoney(VaultHook.getEconomy().getBalance(player)) : "Economy offline";
+
+        inv.setItem(4, createGuiItem(
+                Material.GOLD_BLOCK,
+                "&e&lSaldo Bank",
+                "&7Bank: &6" + formatMoney(island.getBankBalance()),
+                "&7Limit: &e" + limitText,
+                "&7Wallet kamu: &a" + wallet,
+                "&7Withdraw butuh role Trusted ke atas."
+        ));
+
+        inv.setItem(10, createGuiItem(Material.LIME_DYE, "&aDeposit $100", "&7Masukkan $100 ke bank island."));
+        inv.setItem(11, createGuiItem(Material.LIME_DYE, "&aDeposit $1,000", "&7Masukkan $1,000 ke bank island."));
+        inv.setItem(12, createGuiItem(Material.LIME_DYE, "&aDeposit $10,000", "&7Masukkan $10,000 ke bank island."));
+        inv.setItem(13, createGuiItem(Material.EMERALD, "&aDeposit Maksimal", "&7Masukkan saldo sebanyak yang muat."));
+
+        inv.setItem(19, createGuiItem(Material.RED_DYE, "&cWithdraw $100", "&7Ambil $100 dari bank island."));
+        inv.setItem(20, createGuiItem(Material.RED_DYE, "&cWithdraw $1,000", "&7Ambil $1,000 dari bank island."));
+        inv.setItem(21, createGuiItem(Material.RED_DYE, "&cWithdraw $10,000", "&7Ambil $10,000 dari bank island."));
+        inv.setItem(22, createGuiItem(Material.GOLD_NUGGET, "&cWithdraw Semua", "&7Ambil semua saldo bank island."));
+        inv.setItem(31, createGuiItem(Material.ARROW, "&eKembali", "&7Kembali ke dashboard."));
+
+        if (!VaultHook.hasEconomy()) {
+            inv.setItem(16, createGuiItem(Material.BARRIER, "&cEconomy Belum Tersambung", "&7Deposit dan withdraw tidak tersedia."));
+        }
+
+        fillFiller(inv);
+        player.openInventory(inv);
+    }
+
+    public void openStoryGUI(Player player) {
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("story", null), 36, plugin.getConfigManager().format("&d&lStory Progress"));
+        Island island = plugin.getIslandManager().getIslandByPlayer(player.getUniqueId());
+        int playerStage = plugin.getIslandManager().getStoryStage(player.getUniqueId());
+        int islandStage = island == null ? playerStage : plugin.getIslandManager().getIslandStoryStage(island);
+        boolean hookEnabled = plugin.getConverseCraftHook() != null && plugin.getConverseCraftHook().isEnabled();
+
+        inv.setItem(4, createGuiItem(
+                hookEnabled ? Material.AMETHYST_CLUSTER : Material.BARRIER,
+                "&d&lStory AcidIsland",
+                "&7Stage kamu: &e" + playerStage,
+                "&7Stage island/team: &e" + islandStage,
+                hookEnabled ? "&aConverseCraft aktif." : "&cConverseCraft belum aktif.",
+                "&7Chapter diambil dari config integrations.conversecraft."
+        ));
+
+        List<String> conversations = getStoryConversationIds();
+        int[] slots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
+        if (conversations.isEmpty()) {
+            inv.setItem(13, createGuiItem(Material.BARRIER, "&cBelum Ada Chapter", "&7Isi integrations.conversecraft.story-stage-conversations di config."));
+        } else {
+            boolean sequential = plugin.getConfigManager().getConfig().getBoolean("integrations.conversecraft.enforce-sequential", true);
+            for (int i = 0; i < Math.min(conversations.size(), slots.length); i++) {
+                String conversation = conversations.get(i);
+                int mappedStage = plugin.getConverseCraftHook() == null ? 0 : plugin.getConverseCraftHook().getMappedStoryStage(conversation);
+                boolean completed = mappedStage > 0 && playerStage >= mappedStage;
+                boolean locked = hookEnabled && mappedStage > 0 && sequential && mappedStage > playerStage + 1;
+                Material icon = !hookEnabled ? Material.BARRIER : completed ? Material.LIME_DYE : locked ? Material.REDSTONE : Material.ENCHANTED_BOOK;
+                inv.setItem(slots[i], createGuiItem(
+                        icon,
+                        "&d" + conversation,
+                        mappedStage > 0 ? "&7Target stage: &e" + mappedStage : "&7Target stage: &eManual",
+                        completed ? "&aSudah selesai/terbuka." : locked ? "&cChapter sebelumnya belum selesai." : "&eKlik untuk mulai conversation.",
+                        hookEnabled ? "&7Integrasi ConverseCraft siap." : "&cConverseCraft belum aktif."
+                ));
+            }
+        }
+
+        inv.setItem(31, createGuiItem(Material.ARROW, "&eKembali", "&7Kembali ke dashboard."));
+        fillFiller(inv);
+        player.openInventory(inv);
+    }
+
+    public void openTopGUI(Player player, String origin) {
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("top", null, origin, 0), 27, plugin.getConfigManager().format("&b&lTop AcidIsland"));
+        List<id.alvarennation.acidIsland.island.IslandManager.IslandRanking> top = plugin.getIslandManager().getTopIslands(10);
+        int[] slots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21};
+
+        for (int i = 0; i < Math.min(top.size(), slots.length); i++) {
+            id.alvarennation.acidIsland.island.IslandManager.IslandRanking ranking = top.get(i);
+            OfflinePlayer owner = Bukkit.getOfflinePlayer(ranking.island().getOwner());
+            Material icon = i == 0 ? Material.NETHER_STAR : i < 3 ? Material.GOLD_INGOT : Material.PAPER;
+            inv.setItem(slots[i], createGuiItem(
+                    icon,
+                    "&e#" + (i + 1) + " &f" + getOfflineName(owner),
+                    "&7Level: &a" + ranking.level(),
+                    "&7Value: &a" + ranking.value(),
+                    "&7Theme: &e" + ranking.island().getTheme(),
+                    ranking.island().isLevelScanInProgress() ? "&eSedang scanning value." : "&7Value dari cache."
+            ));
+        }
+        if (top.isEmpty()) {
+            inv.setItem(13, createGuiItem(Material.BARRIER, "&cBelum Ada Island", "&7Ranking masih kosong."));
+        }
+
+        inv.setItem(22, createGuiItem(Material.ARROW, "&eKembali", "&7Kembali ke menu sebelumnya."));
+        fillFiller(inv);
+        player.openInventory(inv);
+    }
+
+    public void openAdminMenu(Player player) {
+        if (!player.hasPermission("acidisland.admin")) {
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
+            return;
+        }
+
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("admin", null), 54, plugin.getConfigManager().format("&c&lAcidIsland Admin"));
+        int islandCount = plugin.getIslandManager().getAllIslands().size();
+        int onlineCount = Bukkit.getOnlinePlayers().size();
+        int storyTracked = plugin.getIslandManager().getStoryStagesSnapshot().size();
+
+        inv.setItem(4, createGuiItem(
+                Material.COMMAND_BLOCK,
+                "&c&lAdmin Dashboard",
+                "&7Total island: &e" + islandCount,
+                "&7Player online: &e" + onlineCount,
+                "&7Story tracked: &e" + storyTracked,
+                "&7World: &b" + plugin.getWorldManager().getAcidWorld().getName()
+        ));
+
+        inv.setItem(10, createGuiItem(Material.PLAYER_HEAD, "&ePlayer Manager", "&7Kelola island player online.", "&eKlik untuk membuka."));
+        inv.setItem(11, createGuiItem(Material.NETHER_STAR, "&bTop Islands", "&7Lihat leaderboard dalam GUI.", "&eKlik untuk membuka."));
+        inv.setItem(12, createGuiItem(Material.REDSTONE, "&aReload Config", "&7Flush vault, reload config/data, rebuild ore table.", "&eKlik untuk reload."));
+        inv.setItem(13, createGuiItem(Material.WRITABLE_BOOK, "&aSave Data", "&7Simpan data island sekarang.", "&eKlik untuk save."));
+        inv.setItem(14, createGuiItem(Material.LODESTONE, "&eSet Lobby", "&7Set lobby AcidIsland ke lokasi kamu.", "&eKlik untuk set."));
+        inv.setItem(15, createGuiItem(Material.ENDER_PEARL, "&eTeleport Lobby", "&7Teleport kamu ke lobby AcidIsland.", "&eKlik untuk teleport."));
+        inv.setItem(16, createGuiItem(Material.AMETHYST_SHARD, "&dStory Tools", "&7Buka player manager lalu pilih player.", "&7Stage bisa +1, +5, -1, atau reset."));
+
+        inv.setItem(22, createGuiItem(Material.CHEST, "&6Open Own Dashboard", "&7Buka dashboard /ai milikmu.", "&eKlik untuk membuka."));
+        inv.setItem(31, createGuiItem(Material.BARRIER, "&cTutup", "&7Tutup menu admin."));
+
+        fillFiller(inv);
+        player.openInventory(inv);
+    }
+
+    public void openAdminPlayersGUI(Player admin, int page) {
+        if (!admin.hasPermission("acidisland.admin")) {
+            admin.sendMessage(plugin.getConfigManager().getMessage(admin, "no-permission"));
+            return;
+        }
+
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("admin_players", null, "", page), 54, plugin.getConfigManager().format("&c&lAdmin Player Manager"));
+        List<Player> players = getSortedOnlinePlayers();
+
+        int start = page * 45;
+        for (int slot = 0; slot < 45 && start + slot < players.size(); slot++) {
+            Player target = players.get(start + slot);
+            Island island = plugin.getIslandManager().getIslandByPlayer(target.getUniqueId());
+            String islandInfo = island == null ? "&cTidak punya island" : "&a" + island.getRole(target.getUniqueId()).getDisplayName() + " &7di island &e" + getOfflineName(Bukkit.getOfflinePlayer(island.getOwner()));
+            inv.setItem(slot, createGuiItem(
+                    Material.PLAYER_HEAD,
+                    "&e" + target.getName(),
+                    islandInfo,
+                    "&7Story stage: &d" + plugin.getIslandManager().getStoryStage(target.getUniqueId()),
+                    "&7World: &b" + target.getWorld().getName(),
+                    "&eKlik untuk kelola player ini."
+            ));
+        }
+
+        if (players.isEmpty()) {
+            inv.setItem(22, createGuiItem(Material.BARRIER, "&cTidak Ada Player Online", "&7Player manager menampilkan player online."));
+        }
+        if (page > 0) {
+            inv.setItem(45, createGuiItem(Material.ARROW, "&ePrevious Page"));
+        }
+        inv.setItem(49, createGuiItem(Material.BARRIER, "&cKembali", "&7Kembali ke admin dashboard."));
+        if (start + 45 < players.size()) {
+            inv.setItem(53, createGuiItem(Material.ARROW, "&eNext Page"));
+        }
+
+        fillFiller(inv);
+        admin.openInventory(inv);
+    }
+
+    public void openAdminPlayerGUI(Player admin, UUID targetUuid) {
+        if (!admin.hasPermission("acidisland.admin")) {
+            admin.sendMessage(plugin.getConfigManager().getMessage(admin, "no-permission"));
+            return;
+        }
+
+        OfflinePlayer target = Bukkit.getOfflinePlayer(targetUuid);
+        Player onlineTarget = target.getPlayer();
+        Island island = plugin.getIslandManager().getIslandByPlayer(targetUuid);
+        Island ownedIsland = plugin.getIslandManager().getIslandByOwner(targetUuid);
+        String targetName = getOfflineName(target);
+
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("admin_player", null, targetUuid.toString(), 0), 45, plugin.getConfigManager().format("&c&lManage " + targetName));
+        inv.setItem(4, createGuiItem(
+                Material.PLAYER_HEAD,
+                "&e&l" + targetName,
+                onlineTarget == null ? "&7Status: &cOffline" : "&7Status: &aOnline",
+                island == null ? "&7Island: &cTidak ada" : "&7Island: &a" + island.getRole(targetUuid).getDisplayName(),
+                ownedIsland == null ? "&7Owner island: &cTidak" : "&7Owner island: &aYa",
+                "&7Story stage: &d" + plugin.getIslandManager().getStoryStage(targetUuid),
+                island == null ? "&7Bank: &e-" : "&7Bank: &6" + formatMoney(island.getBankBalance())
+        ));
+
+        inv.setItem(10, createGuiItem(Material.ENDER_EYE, "&aTP ke Island", island == null ? "&cPlayer tidak punya island." : "&7Teleport admin ke home island player."));
+        inv.setItem(11, createGuiItem(Material.RESPAWN_ANCHOR, "&eReset Island", "&7Hapus island lama dan buat classic island baru.", "&cButuh konfirmasi."));
+        inv.setItem(12, createGuiItem(Material.TNT, "&cDelete Owned Island", ownedIsland == null ? "&cPlayer bukan owner island." : "&7Hapus island milik player.", "&cButuh konfirmasi."));
+        inv.setItem(13, createGuiItem(Material.LIME_DYE, "&aStory +1", "&7Naikkan story stage player satu level."));
+        inv.setItem(14, createGuiItem(Material.RED_DYE, "&cStory -1", "&7Turunkan story stage player satu level."));
+        inv.setItem(15, createGuiItem(Material.EMERALD, "&aStory +5", "&7Naikkan story stage player lima level."));
+        inv.setItem(16, createGuiItem(Material.BARRIER, "&cReset Story", "&7Set story stage player ke 0."));
+
+        inv.setItem(20, createGuiItem(Material.IRON_BARS, "&eRemove From Current Island", island == null || island.isOwner(targetUuid) ? "&cHanya untuk member non-owner." : "&7Keluarkan player dari island saat ini."));
+        inv.setItem(21, createGuiItem(Material.BELL, "&eSend To Lobby", onlineTarget == null ? "&cPlayer offline." : "&7Teleport player ke lobby."));
+        inv.setItem(31, createGuiItem(Material.ARROW, "&eKembali", "&7Kembali ke daftar player."));
+
+        fillFiller(inv);
+        admin.openInventory(inv);
+    }
+
+    private void openAdminConfirmGUI(Player admin, UUID targetUuid, String action) {
+        OfflinePlayer target = Bukkit.getOfflinePlayer(targetUuid);
+        String actionName = action.equals("reset") ? "Reset Island" : "Delete Island";
+        Inventory inv = Bukkit.createInventory(
+                new AcidIslandHolder("admin_confirm", null, action + ":" + targetUuid, 0),
+                27,
+                plugin.getConfigManager().format("&c&lConfirm " + actionName)
+        );
+        inv.setItem(11, createGuiItem(Material.RED_WOOL, "&c&lKONFIRMASI", "&7Target: &e" + getOfflineName(target), "&7Action: &c" + actionName, "&cKlik untuk eksekusi."));
+        inv.setItem(15, createGuiItem(Material.GREEN_WOOL, "&a&lBATAL", "&7Kembali ke menu player."));
+        fillFiller(inv);
+        admin.openInventory(inv);
     }
 
     // ==========================================
@@ -435,7 +757,23 @@ public class IslandGUI implements Listener {
         String guiType = holder.getGuiType();
         Island island = holder.getIsland();
 
-        if (guiType.equals("starter")) {
+        if (guiType.equals("main")) {
+            handleMainMenuClick(player, island, slot);
+        } else if (guiType.equals("bank")) {
+            handleBankClick(player, island, slot);
+        } else if (guiType.equals("story")) {
+            handleStoryClick(player, slot);
+        } else if (guiType.equals("top")) {
+            handleTopClick(player, holder.getContext(), slot);
+        } else if (guiType.equals("admin")) {
+            handleAdminClick(player, slot);
+        } else if (guiType.equals("admin_players")) {
+            handleAdminPlayersClick(player, holder.getPage(), slot);
+        } else if (guiType.equals("admin_player")) {
+            handleAdminPlayerClick(player, holder.getContext(), slot);
+        } else if (guiType.equals("admin_confirm")) {
+            handleAdminConfirmClick(player, holder.getContext(), slot);
+        } else if (guiType.equals("starter")) {
             handleStarterClick(player, slot);
         } else if (guiType.equals("main_settings")) {
             handleMainSettingsClick(player, island, slot);
@@ -459,6 +797,316 @@ public class IslandGUI implements Listener {
         if (!(event.getInventory().getHolder() instanceof AcidIslandHolder holder)) return;
         if (!holder.getGuiType().equals("vault")) {
             event.setCancelled(true);
+        }
+    }
+
+    private void handleMainMenuClick(Player player, Island island, int slot) {
+        if (island == null) {
+            switch (slot) {
+                case 11 -> {
+                    openStarterGUI(player);
+                    player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+                }
+                case 13 -> {
+                    openTopGUI(player, "main");
+                    player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+                }
+                case 15 -> teleportToLobby(player);
+                case 22 -> {
+                    if (player.hasPermission("acidisland.admin")) {
+                        openAdminMenu(player);
+                        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+                    }
+                }
+            }
+            return;
+        }
+
+        switch (slot) {
+            case 10 -> teleportToIslandHome(player, island);
+            case 11 -> {
+                player.closeInventory();
+                player.performCommand("ai sethome");
+            }
+            case 12 -> {
+                openSettingsCategoryGUI(player, island);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 13 -> {
+                openUpgradesGUI(player, island);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 14 -> {
+                openVault(player, island);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 15 -> {
+                openBankGUI(player, island);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 16 -> {
+                openQuestsGUI(player, island);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 20 -> {
+                openThemesGUI(player, island);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 21 -> {
+                openStoryGUI(player);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 22 -> {
+                openTopGUI(player, "main");
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 23 -> teleportToLobby(player);
+            case 24 -> {
+                if (island.isOwner(player.getUniqueId())) {
+                    openDeleteConfirmGUI(player, island);
+                    player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+                } else {
+                    player.sendMessage(plugin.getConfigManager().format("&cHanya owner island yang bisa menghapus island."));
+                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                }
+            }
+            case 31 -> {
+                if (!island.canManage(player.getUniqueId())) {
+                    player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
+                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                    return;
+                }
+                plugin.getIslandManager().getIslandValue(island, true);
+                player.sendMessage(plugin.getConfigManager().format("&aScan value island dijadwalkan. Buka menu lagi sebentar lagi untuk hasil terbaru."));
+                openMainMenu(player);
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+            }
+            case 40 -> {
+                if (player.hasPermission("acidisland.admin")) {
+                    openAdminMenu(player);
+                    player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+                }
+            }
+        }
+    }
+
+    private void handleBankClick(Player player, Island island, int slot) {
+        if (island == null) {
+            player.closeInventory();
+            return;
+        }
+
+        switch (slot) {
+            case 10 -> depositBank(player, island, 100.0, false);
+            case 11 -> depositBank(player, island, 1000.0, false);
+            case 12 -> depositBank(player, island, 10000.0, false);
+            case 13 -> depositBank(player, island, 0.0, true);
+            case 19 -> withdrawBank(player, island, 100.0, false);
+            case 20 -> withdrawBank(player, island, 1000.0, false);
+            case 21 -> withdrawBank(player, island, 10000.0, false);
+            case 22 -> withdrawBank(player, island, 0.0, true);
+            case 31 -> {
+                openMainMenu(player);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+        }
+    }
+
+    private void handleStoryClick(Player player, int slot) {
+        if (slot == 31) {
+            openMainMenu(player);
+            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            return;
+        }
+
+        int index = storySlotIndex(slot);
+        if (index < 0) {
+            return;
+        }
+
+        List<String> conversations = getStoryConversationIds();
+        if (index >= conversations.size()) {
+            return;
+        }
+
+        if (plugin.getConverseCraftHook() == null || !plugin.getConverseCraftHook().isEnabled()) {
+            player.sendMessage(plugin.getConfigManager().format("&cConverseCraft belum aktif di server ini."));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        String conversation = conversations.get(index);
+        int mappedStage = plugin.getConverseCraftHook().getMappedStoryStage(conversation);
+        if (mappedStage > 0 && plugin.getConfigManager().getConfig().getBoolean("integrations.conversecraft.enforce-sequential", true)) {
+            int currentStage = plugin.getIslandManager().getStoryStage(player.getUniqueId());
+            if (mappedStage > currentStage + 1) {
+                player.sendMessage(plugin.getConfigManager().format("&cSelesaikan chapter sebelumnya dulu. Stage kamu: &e" + currentStage + "&c."));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                return;
+            }
+        }
+
+        player.closeInventory();
+        boolean started = plugin.getConverseCraftHook().startConversation(player, conversation);
+        if (!started) {
+            player.sendMessage(plugin.getConfigManager().format("&cConversation &e" + conversation + " &cgagal dimulai atau tidak ditemukan."));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+        }
+    }
+
+    private void handleTopClick(Player player, String origin, int slot) {
+        if (slot != 22) {
+            return;
+        }
+        if (origin.equalsIgnoreCase("admin") && player.hasPermission("acidisland.admin")) {
+            openAdminMenu(player);
+        } else {
+            openMainMenu(player);
+        }
+        player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+    }
+
+    private void handleAdminClick(Player player, int slot) {
+        if (!player.hasPermission("acidisland.admin")) {
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
+            player.closeInventory();
+            return;
+        }
+
+        switch (slot) {
+            case 10 -> {
+                openAdminPlayersGUI(player, 0);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 11 -> {
+                openTopGUI(player, "admin");
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 12 -> {
+                player.closeInventory();
+                player.performCommand("ai reload");
+            }
+            case 13 -> {
+                plugin.getIslandGUI().flushAllVaults();
+                plugin.getIslandManager().saveData();
+                player.sendMessage(plugin.getConfigManager().format("&aData AcidIsland berhasil disimpan."));
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+                openAdminMenu(player);
+            }
+            case 14 -> {
+                player.closeInventory();
+                player.performCommand("ai setlobby");
+            }
+            case 15 -> teleportToLobby(player);
+            case 22 -> {
+                openMainMenu(player);
+                player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 31 -> player.closeInventory();
+        }
+    }
+
+    private void handleAdminPlayersClick(Player admin, int page, int slot) {
+        if (!admin.hasPermission("acidisland.admin")) {
+            admin.sendMessage(plugin.getConfigManager().getMessage(admin, "no-permission"));
+            admin.closeInventory();
+            return;
+        }
+
+        if (slot == 45 && page > 0) {
+            openAdminPlayersGUI(admin, page - 1);
+            admin.playSound(admin.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            return;
+        }
+        if (slot == 49) {
+            openAdminMenu(admin);
+            admin.playSound(admin.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            return;
+        }
+        List<Player> players = getSortedOnlinePlayers();
+        if (slot == 53 && (page + 1) * 45 < players.size()) {
+            openAdminPlayersGUI(admin, page + 1);
+            admin.playSound(admin.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            return;
+        }
+        if (slot < 0 || slot >= 45) {
+            return;
+        }
+
+        int index = page * 45 + slot;
+        if (index >= players.size()) {
+            return;
+        }
+
+        openAdminPlayerGUI(admin, players.get(index).getUniqueId());
+        admin.playSound(admin.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+    }
+
+    private void handleAdminPlayerClick(Player admin, String context, int slot) {
+        if (!admin.hasPermission("acidisland.admin")) {
+            admin.sendMessage(plugin.getConfigManager().getMessage(admin, "no-permission"));
+            admin.closeInventory();
+            return;
+        }
+
+        UUID targetUuid = parseUuid(context);
+        if (targetUuid == null) {
+            admin.closeInventory();
+            admin.sendMessage(plugin.getConfigManager().format("&cTarget admin GUI tidak valid."));
+            return;
+        }
+
+        switch (slot) {
+            case 10 -> adminTeleportToIsland(admin, targetUuid);
+            case 11 -> openAdminConfirmGUI(admin, targetUuid, "reset");
+            case 12 -> {
+                if (plugin.getIslandManager().getIslandByOwner(targetUuid) == null) {
+                    admin.sendMessage(plugin.getConfigManager().format("&cPlayer tersebut bukan owner island."));
+                    admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                    return;
+                }
+                openAdminConfirmGUI(admin, targetUuid, "delete");
+            }
+            case 13 -> adjustStoryStage(admin, targetUuid, 1);
+            case 14 -> adjustStoryStage(admin, targetUuid, -1);
+            case 15 -> adjustStoryStage(admin, targetUuid, 5);
+            case 16 -> setStoryStage(admin, targetUuid, 0);
+            case 20 -> adminRemoveFromCurrentIsland(admin, targetUuid);
+            case 21 -> adminSendTargetToLobby(admin, targetUuid);
+            case 31 -> {
+                openAdminPlayersGUI(admin, 0);
+                admin.playSound(admin.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+        }
+    }
+
+    private void handleAdminConfirmClick(Player admin, String context, int slot) {
+        String[] parts = context.split(":", 2);
+        if (parts.length != 2) {
+            admin.closeInventory();
+            return;
+        }
+
+        UUID targetUuid = parseUuid(parts[1]);
+        if (targetUuid == null) {
+            admin.closeInventory();
+            admin.sendMessage(plugin.getConfigManager().format("&cTarget admin GUI tidak valid."));
+            return;
+        }
+
+        if (slot == 15) {
+            openAdminPlayerGUI(admin, targetUuid);
+            admin.playSound(admin.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            return;
+        }
+        if (slot != 11) {
+            return;
+        }
+
+        if (parts[0].equalsIgnoreCase("reset")) {
+            adminResetIsland(admin, targetUuid);
+        } else if (parts[0].equalsIgnoreCase("delete")) {
+            adminDeleteOwnedIsland(admin, targetUuid);
         }
     }
 
@@ -714,6 +1362,212 @@ public class IslandGUI implements Listener {
         changeTheme(player, island, themeIds.get(slot));
     }
 
+    private void teleportToIslandHome(Player player, Island island) {
+        player.closeInventory();
+        player.teleport(island.getHome(plugin.getWorldManager().getAcidWorld()));
+        plugin.getWorldManager().applyWorldBorder(player, island);
+        player.sendMessage(plugin.getConfigManager().getMessage(player, "teleport-home"));
+    }
+
+    private void teleportToLobby(Player player) {
+        player.closeInventory();
+        player.teleport(plugin.getLobbyLocation());
+        player.setWorldBorder(null);
+        player.sendMessage(plugin.getConfigManager().getMessage(player, "teleport-lobby"));
+    }
+
+    private void depositBank(Player player, Island island, double requestedAmount, boolean all) {
+        if (!VaultHook.hasEconomy()) {
+            player.sendMessage(plugin.getConfigManager().format("&cEconomy system belum tersambung!"));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        double wallet = VaultHook.getEconomy().getBalance(player);
+        double limit = getBankLimit(island);
+        double capacity = limit < 0 ? wallet : Math.max(0.0, limit - island.getBankBalance());
+        double amount = all ? Math.min(wallet, capacity) : requestedAmount;
+        amount = roundMoney(amount);
+
+        if (amount <= 0 || wallet < amount || (!all && limit >= 0 && island.getBankBalance() + amount > limit)) {
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-deposit-fail"));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        EconomyResponse response = VaultHook.getEconomy().withdrawPlayer(player, amount);
+        if (!response.transactionSuccess()) {
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-deposit-fail"));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        island.setBankBalance(roundMoney(island.getBankBalance() + amount));
+        plugin.getIslandManager().saveData();
+        player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-deposit-success", "{amount}", String.valueOf(amount)));
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        openBankGUI(player, island);
+    }
+
+    private void withdrawBank(Player player, Island island, double requestedAmount, boolean all) {
+        if (!island.canUseBank(player.getUniqueId())) {
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+        if (!VaultHook.hasEconomy()) {
+            player.sendMessage(plugin.getConfigManager().format("&cEconomy system belum tersambung!"));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        double amount = all ? island.getBankBalance() : requestedAmount;
+        amount = roundMoney(amount);
+        if (amount <= 0 || island.getBankBalance() < amount) {
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-withdraw-fail"));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        EconomyResponse response = VaultHook.getEconomy().depositPlayer(player, amount);
+        if (!response.transactionSuccess()) {
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-withdraw-fail"));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        island.setBankBalance(roundMoney(island.getBankBalance() - amount));
+        plugin.getIslandManager().saveData();
+        player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-withdraw-success", "{amount}", String.valueOf(amount)));
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        openBankGUI(player, island);
+    }
+
+    private int storySlotIndex(int slot) {
+        int[] slots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
+        for (int i = 0; i < slots.length; i++) {
+            if (slots[i] == slot) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private List<Player> getSortedOnlinePlayers() {
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        players.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
+        return players;
+    }
+
+    private UUID parseUuid(String raw) {
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private void adminTeleportToIsland(Player admin, UUID targetUuid) {
+        Island island = plugin.getIslandManager().getIslandByPlayer(targetUuid);
+        if (island == null) {
+            admin.sendMessage(plugin.getConfigManager().format("&cPlayer tersebut tidak punya island."));
+            admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+        admin.closeInventory();
+        admin.teleport(island.getHome(plugin.getWorldManager().getAcidWorld()));
+        plugin.getWorldManager().applyWorldBorder(admin, island);
+        admin.sendMessage(plugin.getConfigManager().format("&aTeleport ke island " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + "."));
+    }
+
+    private void adjustStoryStage(Player admin, UUID targetUuid, int delta) {
+        int current = plugin.getIslandManager().getStoryStage(targetUuid);
+        setStoryStage(admin, targetUuid, Math.max(0, current + delta));
+    }
+
+    private void setStoryStage(Player admin, UUID targetUuid, int stage) {
+        int normalized = Math.max(0, stage);
+        plugin.getIslandManager().setStoryStage(targetUuid, normalized);
+        String targetName = getOfflineName(Bukkit.getOfflinePlayer(targetUuid));
+        admin.sendMessage(plugin.getConfigManager().format("&aStory stage " + targetName + " diset ke &e" + normalized + "&a."));
+        Player onlineTarget = Bukkit.getPlayer(targetUuid);
+        if (onlineTarget != null) {
+            onlineTarget.sendMessage(plugin.getConfigManager().format("&aStory progress kamu sekarang stage &e" + normalized + "&a."));
+        }
+        admin.playSound(admin.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        openAdminPlayerGUI(admin, targetUuid);
+    }
+
+    private void adminRemoveFromCurrentIsland(Player admin, UUID targetUuid) {
+        Island island = plugin.getIslandManager().getIslandByPlayer(targetUuid);
+        if (island == null || island.isOwner(targetUuid)) {
+            admin.sendMessage(plugin.getConfigManager().format("&cPlayer bukan member non-owner di island mana pun."));
+            admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        plugin.getIslandManager().removePlayerFromCurrentIsland(targetUuid);
+        Player onlineTarget = Bukkit.getPlayer(targetUuid);
+        if (onlineTarget != null) {
+            onlineTarget.setWorldBorder(null);
+            onlineTarget.teleport(plugin.getLobbyLocation());
+            onlineTarget.sendMessage(plugin.getConfigManager().format("&cKamu dikeluarkan dari island oleh admin."));
+        }
+        admin.sendMessage(plugin.getConfigManager().format("&aPlayer " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + " dikeluarkan dari island saat ini."));
+        admin.playSound(admin.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        openAdminPlayerGUI(admin, targetUuid);
+    }
+
+    private void adminSendTargetToLobby(Player admin, UUID targetUuid) {
+        Player target = Bukkit.getPlayer(targetUuid);
+        if (target == null) {
+            admin.sendMessage(plugin.getConfigManager().format("&cPlayer target sedang offline."));
+            admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+        target.setWorldBorder(null);
+        target.teleport(plugin.getLobbyLocation());
+        target.sendMessage(plugin.getConfigManager().format("&eKamu dipindahkan ke lobby oleh admin."));
+        admin.sendMessage(plugin.getConfigManager().format("&a" + target.getName() + " dipindahkan ke lobby."));
+        admin.playSound(admin.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        openAdminPlayerGUI(admin, targetUuid);
+    }
+
+    private void adminResetIsland(Player admin, UUID targetUuid) {
+        plugin.getIslandManager().removePlayerFromCurrentIsland(targetUuid);
+        Island oldIsland = plugin.getIslandManager().deleteIsland(targetUuid, true, false);
+        if (oldIsland != null) {
+            teleportParticipantsToLobby(oldIsland);
+        }
+
+        Island newIsland = plugin.getIslandManager().createIsland(targetUuid, "classic", false);
+        Player onlineTarget = Bukkit.getPlayer(targetUuid);
+        if (onlineTarget != null) {
+            onlineTarget.teleport(newIsland.getHome(plugin.getWorldManager().getAcidWorld()));
+            plugin.getWorldManager().applyWorldBorder(onlineTarget, newIsland);
+            onlineTarget.sendMessage(plugin.getConfigManager().format("&aIsland kamu sudah direset oleh admin."));
+        }
+
+        admin.sendMessage(plugin.getConfigManager().format("&aIsland milik " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + " sudah direset."));
+        admin.playSound(admin.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+        openAdminPlayerGUI(admin, targetUuid);
+    }
+
+    private void adminDeleteOwnedIsland(Player admin, UUID targetUuid) {
+        Island deleted = plugin.getIslandManager().deleteIsland(targetUuid, true);
+        if (deleted == null) {
+            admin.sendMessage(plugin.getConfigManager().format("&cPlayer tersebut tidak punya island sebagai owner."));
+            admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            openAdminPlayerGUI(admin, targetUuid);
+            return;
+        }
+
+        teleportParticipantsToLobby(deleted);
+        admin.sendMessage(plugin.getConfigManager().format("&aIsland milik " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + " dihapus dan cleanup dijadwalkan."));
+        admin.playSound(admin.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.8f);
+        openAdminPlayerGUI(admin, targetUuid);
+    }
+
     private void changeTheme(Player player, Island island, String themeId) {
         String normalized = themeId.toLowerCase(Locale.ROOT);
         String path = "themes." + normalized;
@@ -768,6 +1622,34 @@ public class IslandGUI implements Listener {
             }
         }
         return ids;
+    }
+
+    private List<String> getStoryConversationIds() {
+        ConfigurationSection section = plugin.getConfigManager().getConfig().getConfigurationSection("integrations.conversecraft.story-stage-conversations");
+        List<String> ids = new ArrayList<>();
+        if (section == null) {
+            return ids;
+        }
+        ids.addAll(section.getKeys(false));
+        ids.sort(String.CASE_INSENSITIVE_ORDER);
+        return ids;
+    }
+
+    private double getBankLimit(Island island) {
+        int bankLevel = island.getLevel("bank");
+        return plugin.getConfigManager().getConfig().getDouble("upgrades.bank." + bankLevel + ".limit", 10000.0);
+    }
+
+    private double roundMoney(double value) {
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    private String formatMoney(double value) {
+        return "$" + String.format(Locale.US, "%,.2f", value);
+    }
+
+    private String getOfflineName(OfflinePlayer player) {
+        return player.getName() == null ? player.getUniqueId().toString() : player.getName();
     }
 
     private String formatDuration(long millis) {

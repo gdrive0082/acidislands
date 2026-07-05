@@ -28,6 +28,10 @@ permissions:
     default: false
   acidisland.command.help:
     default: true
+  acidisland.command.menu:
+    default: true
+  acidisland.command.gui:
+    default: true
   acidisland.command.start:
     default: true
   acidisland.command.home:

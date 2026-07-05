@@ -9,7 +9,7 @@ import java.util.Set;
 final class AcidIslandCommandSpec {
 
     static final List<String> PLAYER_SUBCOMMANDS = List.of(
-            "help", "start", "home", "sethome", "settings", "upgrade",
+            "help", "menu", "gui", "start", "home", "sethome", "settings", "upgrade",
             "vault", "bank", "invite", "accept", "reject", "kick",
             "leave", "delete", "lobby", "info", "quest", "level",
             "story", "top", "theme", "role"
@@ -28,6 +28,7 @@ final class AcidIslandCommandSpec {
     static final List<String> STORY_STAGE_SAMPLES = List.of("0", "1", "2", "3", "4", "5");
 
     static final List<String> HELP_LINES = List.of(
+            "menu|gui \u00a77- Buka dashboard utama.",
             "start|home|sethome|lobby \u00a77- Navigasi island.",
             "info|level [refresh]|top \u00a77- Info dan leaderboard.",
             "settings|upgrade|vault|bank \u00a77- GUI, upgrade, storage, ekonomi.",
