@@ -87,11 +87,11 @@ public final class AcidIsland extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (worldManager != null) {
+            worldManager.shutdown();
+        }
         if (islandGUI != null) {
             islandGUI.flushAllVaults();
-        }
-        if (worldManager != null) {
-            worldManager.cancelIslandValueScans();
         }
         // Save all data on plugin shutdown
         if (islandManager != null) {

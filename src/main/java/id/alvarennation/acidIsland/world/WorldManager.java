@@ -22,22 +22,35 @@ import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class WorldManager {
 
     private final AcidIsland plugin;
     private World acidWorld;
     private final IslandValueScanner islandValueScanner;
+    private final Set<BukkitTask> cleanupTasks = ConcurrentHashMap.newKeySet();
+    private final Set<BukkitTask> biomeTasks = ConcurrentHashMap.newKeySet();
+    private volatile boolean shuttingDown = false;
 
     public WorldManager(AcidIsland plugin) {
         this.plugin = plugin;
         this.islandValueScanner = new IslandValueScanner(plugin);
+    }
+
+    public void shutdown() {
+        shuttingDown = true;
+        cancelScheduledWorldTasks();
+        cancelIslandValueScans();
     }
 
     public void initWorld() {
@@ -50,6 +63,7 @@ public class WorldManager {
         
         this.acidWorld = creator.createWorld();
         if (this.acidWorld != null) {
+            ensureWorldDataDirectory(this.acidWorld);
             this.acidWorld.setStorm(false);
             this.acidWorld.setThundering(false);
             this.acidWorld.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, true);
@@ -62,6 +76,13 @@ public class WorldManager {
             initWorld();
         }
         return acidWorld;
+    }
+
+    private void ensureWorldDataDirectory(World world) {
+        File dataDirectory = new File(world.getWorldFolder(), "data");
+        if (!dataDirectory.exists() && !dataDirectory.mkdirs()) {
+            plugin.getLogger().warning("Could not create data folder for world " + world.getName() + ": " + dataDirectory.getPath());
+        }
     }
 
     public void generateStarterIsland(int cx, int cz, String type) {
@@ -509,15 +530,46 @@ public class WorldManager {
 
         removeNonPlayerEntities(world, island.getX(), island.getZ(), half, minY, maxY);
 
-        new BukkitRunnable() {
+        cleanupTasks.removeIf(BukkitTask::isCancelled);
+        BukkitRunnable cleanupTask = new BukkitRunnable() {
             private int x = minX;
             private int z = minZ;
+            private int waitingChunkX = Integer.MIN_VALUE;
+            private int waitingChunkZ = Integer.MIN_VALUE;
+            private boolean waitingForChunk = false;
+            private volatile boolean chunkLoadFailed = false;
+            private volatile String chunkLoadFailureMessage = "";
 
             @Override
             public void run() {
+                if (shouldStopWorldTask()) {
+                    finishCleanup(false);
+                    return;
+                }
+                if (chunkLoadFailed) {
+                    if (!shuttingDown) {
+                        plugin.getLogger().warning("Stopping island cleanup at " + island.getX() + ", " + island.getZ()
+                                + " because a chunk could not be loaded: " + chunkLoadFailureMessage);
+                    }
+                    finishCleanup(false);
+                    return;
+                }
+
                 int processed = 0;
                 while (processed < columnsPerTick) {
-                    resetColumn(world, x, z, minY, maxY, waterHeight);
+                    if (!ensureChunkReady(world, x, z)) {
+                        return;
+                    }
+                    try {
+                        resetColumn(world, x, z, minY, maxY, waterHeight);
+                    } catch (IllegalStateException ex) {
+                        if (!shuttingDown) {
+                            plugin.getLogger().warning("Stopping island cleanup at " + island.getX() + ", " + island.getZ()
+                                    + " because the chunk system rejected a request: " + ex.getMessage());
+                        }
+                        finishCleanup(false);
+                        return;
+                    }
                     processed++;
 
                     z++;
@@ -526,13 +578,59 @@ public class WorldManager {
                         x++;
                     }
                     if (x > maxX) {
-                        cancel();
+                        finishCleanup(true);
                         plugin.getLogger().info("Finished cleaning island at " + island.getX() + ", " + island.getZ() + ".");
                         return;
                     }
                 }
             }
-        }.runTaskTimer(plugin, 1L, 1L);
+
+            private boolean ensureChunkReady(World world, int blockX, int blockZ) {
+                int chunkX = blockX >> 4;
+                int chunkZ = blockZ >> 4;
+                if (world.isChunkLoaded(chunkX, chunkZ)) {
+                    waitingForChunk = false;
+                    return true;
+                }
+                if (shouldStopWorldTask()) {
+                    finishCleanup(false);
+                    return false;
+                }
+                if (waitingForChunk && waitingChunkX == chunkX && waitingChunkZ == chunkZ) {
+                    return false;
+                }
+
+                waitingForChunk = true;
+                waitingChunkX = chunkX;
+                waitingChunkZ = chunkZ;
+                try {
+                    world.getChunkAtAsync(chunkX, chunkZ).whenComplete((chunk, throwable) -> {
+                        waitingForChunk = false;
+                        if (throwable != null) {
+                            chunkLoadFailed = true;
+                            chunkLoadFailureMessage = throwable.getMessage();
+                        }
+                    });
+                } catch (IllegalStateException ex) {
+                    if (!shuttingDown) {
+                        chunkLoadFailed = true;
+                        chunkLoadFailureMessage = ex.getMessage();
+                    } else {
+                        finishCleanup(false);
+                    }
+                }
+                return false;
+            }
+
+            private void finishCleanup(boolean completed) {
+                cancel();
+                cleanupTasks.removeIf(BukkitTask::isCancelled);
+                if (!completed && !shuttingDown && plugin.isEnabled()) {
+                    plugin.getLogger().info("Island cleanup at " + island.getX() + ", " + island.getZ() + " was cancelled safely.");
+                }
+            }
+        };
+        cleanupTasks.add(cleanupTask.runTaskTimer(plugin, 1L, 1L));
     }
 
     public void scheduleIslandValueScan(Island island) {
@@ -559,12 +657,18 @@ public class WorldManager {
         int minZ = island.getZ() - half;
         int maxZ = island.getZ() + half;
 
-        new BukkitRunnable() {
+        biomeTasks.removeIf(BukkitTask::isCancelled);
+        BukkitRunnable biomeTask = new BukkitRunnable() {
             private int x = minX;
             private int z = minZ;
 
             @Override
             public void run() {
+                if (shouldStopWorldTask()) {
+                    cancel();
+                    biomeTasks.removeIf(BukkitTask::isCancelled);
+                    return;
+                }
                 int processed = 0;
                 while (processed < columnsPerTick) {
                     world.setBiome(x, z, biome);
@@ -577,11 +681,13 @@ public class WorldManager {
                     }
                     if (x > maxX) {
                         cancel();
+                        biomeTasks.removeIf(BukkitTask::isCancelled);
                         return;
                     }
                 }
             }
-        }.runTaskTimer(plugin, 1L, 1L);
+        };
+        biomeTasks.add(biomeTask.runTaskTimer(plugin, 1L, 1L));
 
         island.setTheme(themeId);
         island.invalidateLevelCache();
@@ -649,6 +755,17 @@ public class WorldManager {
 
     private void setBlock(World world, int x, int y, int z, Material material) {
         world.getBlockAt(x, y, z).setType(material, false);
+    }
+
+    private boolean shouldStopWorldTask() {
+        return shuttingDown || !plugin.isEnabled();
+    }
+
+    private void cancelScheduledWorldTasks() {
+        cleanupTasks.forEach(BukkitTask::cancel);
+        cleanupTasks.clear();
+        biomeTasks.forEach(BukkitTask::cancel);
+        biomeTasks.clear();
     }
 
     private void resetColumn(World world, int x, int z, int minY, int maxY, int waterHeight) {

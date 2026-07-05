@@ -6,7 +6,7 @@
 
     <groupId>id.alvarennation</groupId>
     <artifactId>AcidIsland</artifactId>
-    <version>1.0-syncfix5-oceanfix2</version>
+    <version>1.0-syncfix5-oceanfix3</version>
     <packaging>jar</packaging>
 
     <name>AcidIsland</name>

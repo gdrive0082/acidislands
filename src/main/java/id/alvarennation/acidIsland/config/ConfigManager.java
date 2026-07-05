@@ -78,7 +78,7 @@ public class ConfigManager {
 
     private void migrateConfig() {
         int previousVersion = config.getInt("config-version", 0);
-        int bundledVersion = 10;
+        int bundledVersion = 11;
         try (InputStream defaultsStream = plugin.getResource("config.yml")) {
             if (defaultsStream != null) {
                 FileConfiguration defaults = YamlConfiguration.loadConfiguration(
