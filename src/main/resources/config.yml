@@ -74,8 +74,8 @@ starters:
   classic:
     display-name: "&aClassic Island"
     lore:
-      - "&7Pulau klasik berukuran 10x10"
-      - "&7dengan pohon, domba, dan chest starter."
+      - "&7Pulau klasik organik dengan rumput,"
+      - "&7pohon, domba, dan chest starter."
     icon: "OAK_SAPLING"
     chest-items:
       - "OAK_SAPLING:1"
@@ -88,8 +88,8 @@ starters:
   desert:
     display-name: "&eDesert Island"
     lore:
-      - "&7Pulau gurun berukuran 10x10"
-      - "&7dengan pasir dan chest starter desert."
+      - "&7Pulau gurun organik dengan pasir,"
+      - "&7kaktus, acacia, dan chest starter."
     icon: "SAND"
     chest-items:
       - "CACTUS:2"
@@ -102,8 +102,8 @@ starters:
   nether:
     display-name: "&cNether Island"
     lore:
-      - "&7Pulau nether berukuran 10x10"
-      - "&7dengan netherrack dan chest starter nether."
+      - "&7Pulau nether organik dengan nylium,"
+      - "&7crimson fungus, dan chest starter."
     icon: "NETHERRACK"
     chest-items:
       - "CRIMSON_FUNGUS:1"

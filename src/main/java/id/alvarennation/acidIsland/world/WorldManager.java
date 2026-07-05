@@ -63,73 +63,31 @@ public class WorldManager {
         World world = getAcidWorld();
         int islandY = 75; // Ketinggian pulau starter
         int waterHeight = plugin.getConfigManager().getConfig().getInt("acid-water.height", 62);
+        String starterType = type == null ? "classic" : type.toLowerCase(Locale.ROOT);
+        StarterPalette palette = StarterPalette.from(starterType);
+        Random random = new Random((((long) cx) << 32) ^ cz ^ starterType.hashCode());
 
-        Material surfaceMat = Material.GRASS_BLOCK;
-        Material subMat = Material.DIRT;
-        Material fenceMat = Material.OAK_FENCE;
-        TreeType treeType = TreeType.TREE;
-        boolean netherStarter = type.equalsIgnoreCase("nether");
+        clearStarterAir(world, cx, islandY, cz, waterHeight);
+        generateOrganicIslandBase(world, cx, islandY, cz, waterHeight, palette);
+        generateNaturalSupports(world, cx, islandY, cz, waterHeight, palette);
+        decorateStarterIsland(world, cx, islandY, cz, starterType, palette, random);
 
-        if (type.equalsIgnoreCase("desert")) {
-            surfaceMat = Material.SAND;
-            subMat = Material.SANDSTONE;
-            fenceMat = Material.ACACIA_FENCE;
-            treeType = TreeType.ACACIA;
-        } else if (netherStarter) {
-            surfaceMat = Material.NETHERRACK;
-            subMat = Material.NETHERRACK;
-            fenceMat = Material.NETHER_BRICK_FENCE;
-            treeType = TreeType.CRIMSON_FUNGUS;
-        }
-
-        // 1. Generate 10x10 Platform
-        for (int x = cx - 5; x <= cx + 4; x++) {
-            for (int z = cz - 5; z <= cz + 4; z++) {
-                // Layer atas (Y=75)
-                world.getBlockAt(x, islandY, z).setType(surfaceMat);
-                // Layer bawah (Y=74, Y=73)
-                world.getBlockAt(x, islandY - 1, z).setType(subMat);
-                world.getBlockAt(x, islandY - 2, z).setType(subMat);
-            }
-        }
-
-        // 2. Tiang penyangga di tengah bawah sampai water level
-        for (int y = islandY - 3; y >= waterHeight; y--) {
-            world.getBlockAt(cx, y, cz).setType(subMat);
-        }
-
-        // 3. Bedrock penanda tepat di bawah water level
-        world.getBlockAt(cx, waterHeight - 1, cz).setType(Material.BEDROCK);
-
-        // 4. Generate Tree di tengah (Y=76)
-        if (netherStarter) {
-            world.getBlockAt(cx, islandY, cz).setType(Material.CRIMSON_NYLIUM);
-        }
-        Location treeLoc = new Location(world, cx, islandY + 1, cz);
-        boolean treeGenerated = world.generateTree(treeLoc, treeType);
-        if (!treeGenerated && netherStarter) {
-            generateFallbackCrimsonFungus(cx, islandY + 1, cz);
-        }
-
-        // 5. Generate Chest starter (Y=76)
-        Location chestLoc = new Location(world, cx + 2, islandY + 1, cz + 2);
+        Location chestLoc = new Location(world, cx + 3, islandY + 1, cz + 2);
         Block chestBlock = world.getBlockAt(chestLoc);
-        chestBlock.setType(Material.CHEST);
+        chestBlock.setType(Material.CHEST, false);
         if (chestBlock.getState() instanceof Chest chest) {
             Inventory inv = chest.getInventory();
             fillStarterChest(inv, type);
         }
 
-        // 6. Generate Sheep tied to fence
-        Location fenceLoc = new Location(world, cx - 2, islandY + 1, cz - 2);
+        Location fenceLoc = new Location(world, cx - 3, islandY + 1, cz - 2);
         Block fenceBlock = world.getBlockAt(fenceLoc);
-        fenceBlock.setType(fenceMat);
+        fenceBlock.setType(palette.fence(), false);
 
-        Location sheepLoc = new Location(world, cx - 2, islandY + 2, cz - 2);
+        Location sheepLoc = new Location(world, cx - 3, islandY + 2, cz - 2);
         Sheep sheep = (Sheep) world.spawnEntity(sheepLoc, EntityType.SHEEP);
         sheep.setColor(DyeColor.WHITE);
 
-        // Pasang tali (leash) ke fence menggunakan LeashHitch
         try {
             LeashHitch hitch = world.spawn(fenceLoc, LeashHitch.class);
             sheep.setLeashHolder(hitch);
@@ -137,8 +95,7 @@ public class WorldManager {
             plugin.getLogger().warning("Failed to attach starter sheep leash at " + cx + ", " + cz + ": " + ex.getMessage());
         }
 
-        // 7. Generate Mini Ocean Monument di bawah air (Y=40)
-        generateMiniMonument(cx, 40, cz);
+        generateMiniMonument(cx, Math.max(world.getMinHeight() + 12, waterHeight - 22), cz);
     }
 
     private void generateFallbackCrimsonFungus(int cx, int baseY, int cz) {
@@ -160,7 +117,8 @@ public class WorldManager {
 
     private void fillStarterChest(Inventory inv, String type) {
         FileConfiguration config = plugin.getConfigManager().getConfig();
-        String path = "starters." + type.toLowerCase() + ".chest-items";
+        String starterType = type == null ? "classic" : type.toLowerCase(Locale.ROOT);
+        String path = "starters." + starterType + ".chest-items";
         List<String> itemsList = config.getStringList(path);
 
         for (String itemStr : itemsList) {
@@ -171,38 +129,218 @@ public class WorldManager {
         }
     }
 
-    private void generateMiniMonument(int cx, int cy, int cz) {
-        World world = getAcidWorld();
-        // Mini Ocean Monument berukuran 5x5x5 terbuat dari Prismarine
-        // Dinding luar Prismarine, dalam berisi chest harta karun
-        for (int x = cx - 2; x <= cx + 2; x++) {
-            for (int y = cy; y <= cy + 4; y++) {
-                for (int z = cz - 2; z <= cz + 2; z++) {
-                    boolean edge = (x == cx - 2 || x == cx + 2 || y == cy || y == cy + 4 || z == cz - 2 || z == cz + 2);
-                    if (edge) {
-                        // Selubung luar
-                        Material blockType = Material.PRISMARINE;
-                        if (y == cy || y == cy + 4) blockType = Material.PRISMARINE_BRICKS;
-                        world.getBlockAt(x, y, z).setType(blockType);
-                    } else {
-                        // Rongga udara/kosong di dalam agar air beracun tidak masuk ke area chest
-                        world.getBlockAt(x, y, z).setType(Material.AIR);
+    private void clearStarterAir(World world, int cx, int islandY, int cz, int waterHeight) {
+        for (int x = cx - 9; x <= cx + 9; x++) {
+            for (int z = cz - 9; z <= cz + 9; z++) {
+                for (int y = waterHeight + 1; y <= islandY + 11; y++) {
+                    Block block = world.getBlockAt(x, y, z);
+                    if (!block.getType().isAir()) {
+                        block.setType(Material.AIR, false);
                     }
                 }
             }
         }
+    }
 
-        // Pintu masuk kecil di atas (Y=cy+4) atau samping agar player bisa masuk
-        world.getBlockAt(cx, cy + 4, cz).setType(Material.DARK_PRISMARINE); // Penanda pintu masuk (tinggal dihancurkan)
-        
-        // Letakkan Chest Harta Karun di tengah dalam monument
-        Location chestLoc = new Location(world, cx, cy + 1, cz);
+    private void generateOrganicIslandBase(World world, int cx, int islandY, int cz, int waterHeight, StarterPalette palette) {
+        for (int dx = -8; dx <= 8; dx++) {
+            for (int dz = -7; dz <= 7; dz++) {
+                if (!isStarterIslandColumn(cx + dx, cz + dz, dx, dz)) {
+                    continue;
+                }
+
+                double normalized = normalizedIslandDistance(dx, dz);
+                int depth = 2 + Math.max(0, (int) Math.round((1.0 - normalized) * 4.0));
+                if (coordinateNoise(cx + dx, cz + dz, 17) > 0.72) {
+                    depth++;
+                }
+
+                Material top = chooseSurfaceMaterial(cx + dx, cz + dz, palette);
+                setBlock(world, cx + dx, islandY, cz + dz, top);
+                for (int y = islandY - 1; y >= islandY - depth; y--) {
+                    Material body = y <= islandY - depth + 1 ? palette.underside() : palette.subsurface();
+                    setBlock(world, cx + dx, y, cz + dz, body);
+                }
+            }
+        }
+
+        setBlock(world, cx, waterHeight - 1, cz, Material.BEDROCK);
+    }
+
+    private void generateNaturalSupports(World world, int cx, int islandY, int cz, int waterHeight, StarterPalette palette) {
+        generateSupport(world, cx, islandY, cz, waterHeight, palette, 0, 0, 3);
+        generateSupport(world, cx, islandY, cz, waterHeight + 3, palette, -3, 2, 2);
+        generateSupport(world, cx, islandY, cz, waterHeight + 4, palette, 3, -2, 2);
+    }
+
+    private void generateSupport(World world, int cx, int islandY, int cz, int bottomY, StarterPalette palette, int offsetX, int offsetZ, int topRadius) {
+        int topY = islandY - 2;
+        for (int y = topY; y >= bottomY; y--) {
+            double progress = (topY - y) / (double) Math.max(1, topY - bottomY);
+            int radius = progress < 0.24 ? topRadius : progress < 0.62 ? 1 : 0;
+            int driftX = offsetX + (int) Math.round((coordinateNoise(cx + offsetX, cz + y, 41) - 0.5) * 1.2);
+            int driftZ = offsetZ + (int) Math.round((coordinateNoise(cx + y, cz + offsetZ, 43) - 0.5) * 1.2);
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.abs(dx) + Math.abs(dz) <= radius + 1) {
+                        setBlock(world, cx + driftX + dx, y, cz + driftZ + dz, palette.underside());
+                    }
+                }
+            }
+        }
+    }
+
+    private void decorateStarterIsland(World world, int cx, int islandY, int cz, String type, StarterPalette palette, Random random) {
+        Location treeLoc = new Location(world, cx + 1, islandY + 1, cz + 1);
+        if (palette.nether()) {
+            setBlock(world, cx + 1, islandY, cz + 1, Material.CRIMSON_NYLIUM);
+        }
+        boolean treeGenerated = world.generateTree(treeLoc, palette.treeType());
+        if (!treeGenerated) {
+            if (palette.nether()) {
+                generateFallbackCrimsonFungus(cx + 1, islandY + 1, cz + 1);
+            } else if (type.equals("desert")) {
+                generateFallbackAcaciaTree(world, cx + 1, islandY + 1, cz + 1);
+            } else {
+                generateFallbackOakTree(world, cx + 1, islandY + 1, cz + 1);
+            }
+        }
+
+        for (int i = 0; i < 18; i++) {
+            int dx = random.nextInt(15) - 7;
+            int dz = random.nextInt(13) - 6;
+            if (!isStarterIslandColumn(cx + dx, cz + dz, dx, dz)) {
+                continue;
+            }
+            placeStarterDecoration(world, cx + dx, islandY + 1, cz + dz, type, random);
+        }
+
+        if (type.equals("desert")) {
+            placeCactus(world, cx - 4, islandY + 1, cz + 1, 2);
+            setBlock(world, cx + 2, islandY + 1, cz - 4, Material.DEAD_BUSH);
+            setBlock(world, cx - 1, islandY + 1, cz + 4, Material.CUT_SANDSTONE);
+        } else if (type.equals("nether")) {
+            setBlock(world, cx - 4, islandY + 1, cz + 1, Material.BASALT);
+            setBlock(world, cx - 4, islandY + 2, cz + 1, Material.BASALT);
+            setBlock(world, cx + 4, islandY + 1, cz - 2, Material.BLACKSTONE);
+            setBlock(world, cx - 2, islandY + 1, cz + 3, Material.SHROOMLIGHT);
+        } else {
+            setBlock(world, cx - 4, islandY + 1, cz + 2, Material.OAK_LOG);
+            setBlock(world, cx - 3, islandY + 1, cz + 3, Material.MOSS_BLOCK);
+            setBlock(world, cx + 4, islandY + 1, cz - 2, Material.MOSS_CARPET);
+        }
+    }
+
+    private void placeStarterDecoration(World world, int x, int y, int z, String type, Random random) {
+        if (!world.getBlockAt(x, y, z).getType().isAir()) {
+            return;
+        }
+        if (type.equals("desert")) {
+            Material[] options = {Material.DEAD_BUSH, Material.SANDSTONE_SLAB, Material.SMOOTH_SANDSTONE_SLAB};
+            setBlock(world, x, y, z, options[random.nextInt(options.length)]);
+            return;
+        }
+        if (type.equals("nether")) {
+            Material[] options = {Material.CRIMSON_ROOTS, Material.WARPED_ROOTS, Material.CRIMSON_FUNGUS};
+            setBlock(world, x, y, z, options[random.nextInt(options.length)]);
+            return;
+        }
+        Material[] options = {Material.SHORT_GRASS, Material.FERN, Material.POPPY, Material.DANDELION, Material.AZURE_BLUET};
+        setBlock(world, x, y, z, options[random.nextInt(options.length)]);
+    }
+
+    private void placeCactus(World world, int x, int y, int z, int height) {
+        for (int i = 0; i < height; i++) {
+            setBlock(world, x, y + i, z, Material.CACTUS);
+        }
+    }
+
+    private void generateFallbackOakTree(World world, int x, int y, int z) {
+        for (int i = 0; i < 5; i++) {
+            setBlock(world, x, y + i, z, Material.OAK_LOG);
+        }
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                for (int dy = 3; dy <= 5; dy++) {
+                    if (Math.abs(dx) + Math.abs(dz) <= 3) {
+                        setBlock(world, x + dx, y + dy, z + dz, Material.OAK_LEAVES);
+                    }
+                }
+            }
+        }
+        setBlock(world, x, y + 6, z, Material.OAK_LEAVES);
+    }
+
+    private void generateFallbackAcaciaTree(World world, int x, int y, int z) {
+        for (int i = 0; i < 5; i++) {
+            setBlock(world, x, y + i, z, Material.ACACIA_LOG);
+        }
+        for (int dx = -3; dx <= 3; dx++) {
+            for (int dz = -3; dz <= 3; dz++) {
+                if (Math.abs(dx) + Math.abs(dz) <= 4) {
+                    setBlock(world, x + dx, y + 4, z + dz, Material.ACACIA_LEAVES);
+                }
+                if (Math.abs(dx) + Math.abs(dz) <= 2) {
+                    setBlock(world, x + dx, y + 5, z + dz, Material.ACACIA_LEAVES);
+                }
+            }
+        }
+    }
+
+    private void generateMiniMonument(int cx, int cy, int cz) {
+        World world = getAcidWorld();
+        Random random = new Random((((long) cx) << 32) ^ cz ^ 0x5A17BEEF);
+
+        for (int dx = -6; dx <= 6; dx++) {
+            for (int dz = -6; dz <= 6; dz++) {
+                double distance = Math.sqrt(dx * dx + dz * dz);
+                if (distance <= 5.4) {
+                    Material floor = distance <= 2.2 ? Material.DARK_PRISMARINE : chooseRuinBlock(cx + dx, cz + dz);
+                    setBlock(world, cx + dx, cy - 1, cz + dz, Material.PRISMARINE);
+                    setBlock(world, cx + dx, cy, cz + dz, floor);
+                }
+            }
+        }
+
+        for (int dx = -5; dx <= 5; dx++) {
+            for (int dz = -5; dz <= 5; dz++) {
+                double distance = Math.sqrt(dx * dx + dz * dz);
+                boolean doorway = (Math.abs(dx) <= 1 && Math.abs(dz) >= 4) || (Math.abs(dz) <= 1 && Math.abs(dx) >= 4);
+                if (distance < 4.2 || distance > 5.5 || doorway) {
+                    continue;
+                }
+                int height = coordinateNoise(cx + dx, cz + dz, 91) > 0.36 ? 2 : 1;
+                for (int y = 1; y <= height; y++) {
+                    setBlock(world, cx + dx, cy + y, cz + dz, y == height ? Material.PRISMARINE_BRICKS : Material.PRISMARINE);
+                }
+            }
+        }
+
+        int[][] pillars = {{4, 4}, {-4, 4}, {4, -4}, {-4, -4}};
+        for (int[] pillar : pillars) {
+            for (int y = 1; y <= 5; y++) {
+                Material block = y % 2 == 0 ? Material.DARK_PRISMARINE : Material.PRISMARINE_BRICKS;
+                setBlock(world, cx + pillar[0], cy + y, cz + pillar[1], block);
+            }
+            setBlock(world, cx + pillar[0], cy + 6, cz + pillar[1], Material.SEA_LANTERN);
+        }
+
+        for (int i = -2; i <= 2; i++) {
+            setBlock(world, cx + i, cy + 4, cz + 5, Material.PRISMARINE_BRICKS);
+            setBlock(world, cx + i, cy + 4, cz - 5, Material.PRISMARINE_BRICKS);
+            setBlock(world, cx + 5, cy + 4, cz + i, Material.PRISMARINE_BRICKS);
+            setBlock(world, cx - 5, cy + 4, cz + i, Material.PRISMARINE_BRICKS);
+        }
+
+        setBlock(world, cx, cy + 1, cz, Material.DARK_PRISMARINE);
+        setBlock(world, cx + 1, cy + 1, cz, Material.SEA_LANTERN);
+        setBlock(world, cx - 1, cy + 1, cz, Material.SEA_LANTERN);
+        Location chestLoc = new Location(world, cx, cy + 2, cz);
         Block chestBlock = world.getBlockAt(chestLoc);
-        chestBlock.setType(Material.CHEST);
+        chestBlock.setType(Material.CHEST, false);
         if (chestBlock.getState() instanceof Chest chest) {
             Inventory inv = chest.getInventory();
-            
-            // 1. Water Breathing Potion (Sangat krusial untuk bertahan di air)
+
             ItemStack potion = new ItemStack(Material.POTION);
             PotionMeta meta = (PotionMeta) potion.getItemMeta();
             if (meta != null) {
@@ -212,17 +350,23 @@ public class WorldManager {
             }
             inv.addItem(potion);
 
-            // 2. Harta karun lainnya (Gold nugget, Prismarine Crystals, Heart of the Sea, etc.)
             inv.addItem(new ItemStack(Material.GOLD_NUGGET, 8));
             inv.addItem(new ItemStack(Material.PRISMARINE_SHARD, 4));
             inv.addItem(new ItemStack(Material.PRISMARINE_CRYSTALS, 4));
-            
-            Random r = new Random();
-            if (r.nextBoolean()) {
+
+            if (random.nextBoolean()) {
                 inv.addItem(new ItemStack(Material.DIAMOND, 1));
             } else {
                 inv.addItem(new ItemStack(Material.GOLD_INGOT, 2));
             }
+        }
+
+        for (int i = 0; i < 12; i++) {
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            int radius = 6 + random.nextInt(4);
+            int x = cx + (int) Math.round(Math.cos(angle) * radius);
+            int z = cz + (int) Math.round(Math.sin(angle) * radius);
+            setBlock(world, x, cy - 1 + random.nextInt(2), z, chooseRuinBlock(x, z));
         }
     }
 
@@ -352,6 +496,53 @@ public class WorldManager {
         return getThemeBiome(themeId) != null;
     }
 
+    private boolean isStarterIslandColumn(int worldX, int worldZ, int dx, int dz) {
+        double normalized = normalizedIslandDistance(dx, dz);
+        double wobble = (coordinateNoise(worldX, worldZ, 11) - 0.5) * 0.28;
+        boolean protectedCenter = Math.abs(dx) <= 3 && Math.abs(dz) <= 3;
+        return protectedCenter || normalized + wobble <= 1.0;
+    }
+
+    private double normalizedIslandDistance(int dx, int dz) {
+        return (dx * dx) / 56.25 + (dz * dz) / 36.0;
+    }
+
+    private Material chooseSurfaceMaterial(int x, int z, StarterPalette palette) {
+        double noise = coordinateNoise(x, z, 23);
+        if (noise > 0.84) {
+            return palette.surfaceAccent();
+        }
+        if (noise < 0.08) {
+            return palette.surfaceDetail();
+        }
+        return palette.surface();
+    }
+
+    private Material chooseRuinBlock(int x, int z) {
+        double noise = coordinateNoise(x, z, 67);
+        if (noise > 0.82) {
+            return Material.DARK_PRISMARINE;
+        }
+        if (noise > 0.52) {
+            return Material.PRISMARINE_BRICKS;
+        }
+        return Material.PRISMARINE;
+    }
+
+    private double coordinateNoise(int x, int z, int salt) {
+        long value = x * 341873128712L + z * 132897987541L + salt * 42317861L;
+        value ^= value >>> 33;
+        value *= 0xff51afd7ed558ccdL;
+        value ^= value >>> 33;
+        value *= 0xc4ceb9fe1a85ec53L;
+        value ^= value >>> 33;
+        return (value >>> 11) * 0x1.0p-53;
+    }
+
+    private void setBlock(World world, int x, int y, int z, Material material) {
+        world.getBlockAt(x, y, z).setType(material, false);
+    }
+
     private void resetColumn(World world, int x, int z, int minY, int maxY, int waterHeight) {
         int worldMin = world.getMinHeight();
         for (int y = minY; y <= maxY; y++) {
@@ -393,6 +584,52 @@ public class WorldManager {
         } catch (IllegalArgumentException ex) {
             plugin.getLogger().warning("Invalid biome '" + biomeName + "' for theme " + themeId + ".");
             return null;
+        }
+    }
+
+    private record StarterPalette(
+            Material surface,
+            Material surfaceAccent,
+            Material surfaceDetail,
+            Material subsurface,
+            Material underside,
+            Material fence,
+            TreeType treeType,
+            boolean nether
+    ) {
+        private static StarterPalette from(String type) {
+            return switch (type) {
+                case "desert" -> new StarterPalette(
+                        Material.SAND,
+                        Material.SANDSTONE,
+                        Material.SMOOTH_SANDSTONE,
+                        Material.SANDSTONE,
+                        Material.CUT_SANDSTONE,
+                        Material.ACACIA_FENCE,
+                        TreeType.ACACIA,
+                        false
+                );
+                case "nether" -> new StarterPalette(
+                        Material.NETHERRACK,
+                        Material.CRIMSON_NYLIUM,
+                        Material.BLACKSTONE,
+                        Material.NETHERRACK,
+                        Material.BASALT,
+                        Material.NETHER_BRICK_FENCE,
+                        TreeType.CRIMSON_FUNGUS,
+                        true
+                );
+                default -> new StarterPalette(
+                        Material.GRASS_BLOCK,
+                        Material.COARSE_DIRT,
+                        Material.MOSS_BLOCK,
+                        Material.DIRT,
+                        Material.ROOTED_DIRT,
+                        Material.OAK_FENCE,
+                        TreeType.TREE,
+                        false
+                );
+            };
         }
     }
 }
