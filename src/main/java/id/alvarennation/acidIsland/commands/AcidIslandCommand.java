@@ -68,7 +68,11 @@ public class AcidIslandCommand implements CommandExecutor {
                 player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
                 return true;
             }
-            handleTop(sender);
+            if (sender instanceof Player player) {
+                plugin.getIslandGUI().openTopGUI(player, "command");
+            } else {
+                handleTop(sender);
+            }
             return true;
         }
 
@@ -342,11 +346,7 @@ public class AcidIslandCommand implements CommandExecutor {
         double limit = config.getDouble("upgrades.bank." + bankLevel + ".limit", 10000.0);
 
         if (args.length == 1) {
-            String limitStr = limit == -1 ? "Tanpa Batas" : "$" + limit;
-            player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-info",
-                    "{balance}", String.valueOf(island.getBankBalance()),
-                    "{limit}", limitStr));
-            player.sendMessage(plugin.getConfigManager().format("&7Gunakan &e/ai bank deposit <jumlah> &7atau &e/ai bank withdraw <jumlah>"));
+            plugin.getIslandGUI().openBankGUI(player, island);
             return;
         }
 

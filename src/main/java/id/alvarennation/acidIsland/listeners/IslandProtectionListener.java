@@ -44,7 +44,7 @@ public class IslandProtectionListener implements Listener {
         new BukkitRunnable() {
             @Override
             public void run() {
-                String acidWorldName = plugin.getConfigManager().getConfig().getString("world-name", "acid_island_world");
+                String acidWorldName = plugin.getConfigManager().getAcidWorldName();
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     UUID uuid = player.getUniqueId();
                     if (!player.getWorld().getName().equals(acidWorldName)) {

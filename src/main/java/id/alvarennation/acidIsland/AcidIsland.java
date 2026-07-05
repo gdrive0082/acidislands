@@ -16,6 +16,7 @@ import id.alvarennation.acidIsland.world.VoidWorldGenerator;
 import id.alvarennation.acidIsland.world.WorldManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -133,16 +134,16 @@ public final class AcidIsland extends JavaPlugin {
         String worldName = getConfigManager().getConfig().getString("lobby.world", "");
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
-            return Bukkit.getWorlds().get(0).getSpawnLocation();
+            return findSafeLobbyLocation(Bukkit.getWorlds().get(0).getSpawnLocation());
         }
-        return new Location(
+        return findSafeLobbyLocation(new Location(
                 world,
                 getConfigManager().getConfig().getDouble("lobby.x", world.getSpawnLocation().getX()),
                 getConfigManager().getConfig().getDouble("lobby.y", world.getSpawnLocation().getY()),
                 getConfigManager().getConfig().getDouble("lobby.z", world.getSpawnLocation().getZ()),
                 (float) getConfigManager().getConfig().getDouble("lobby.yaw", 0.0),
                 (float) getConfigManager().getConfig().getDouble("lobby.pitch", 0.0)
-        );
+        ));
     }
 
     public void setLobbyLocation(Location location) {
@@ -153,5 +154,62 @@ public final class AcidIsland extends JavaPlugin {
         getConfigManager().getConfig().set("lobby.yaw", location.getYaw());
         getConfigManager().getConfig().set("lobby.pitch", location.getPitch());
         saveConfig();
+    }
+
+    private Location findSafeLobbyLocation(Location preferred) {
+        World world = preferred.getWorld();
+        if (world == null) {
+            return preferred;
+        }
+
+        int x = preferred.getBlockX();
+        int z = preferred.getBlockZ();
+        int minY = world.getMinHeight() + 1;
+        int maxY = world.getMaxHeight() - 2;
+        int startY = Math.max(minY, Math.min(maxY, preferred.getBlockY()));
+
+        for (int y = startY; y <= maxY; y++) {
+            if (isSafeLobbyBlock(world, x, y, z)) {
+                return centeredLobby(preferred, y);
+            }
+        }
+        for (int y = startY - 1; y >= minY; y--) {
+            if (isSafeLobbyBlock(world, x, y, z)) {
+                return centeredLobby(preferred, y);
+            }
+        }
+
+        int highestY = Math.max(minY, Math.min(maxY, world.getHighestBlockYAt(x, z) + 1));
+        if (isSafeLobbyBlock(world, x, highestY, z)) {
+            return centeredLobby(preferred, highestY);
+        }
+        return preferred;
+    }
+
+    private boolean isSafeLobbyBlock(World world, int x, int y, int z) {
+        Material feet = world.getBlockAt(x, y, z).getType();
+        Material head = world.getBlockAt(x, y + 1, z).getType();
+        Material ground = world.getBlockAt(x, y - 1, z).getType();
+        return feet.isAir() && head.isAir() && ground.isSolid() && !isDangerousLobbyGround(ground);
+    }
+
+    private boolean isDangerousLobbyGround(Material material) {
+        String name = material.name();
+        return material == Material.CACTUS
+                || material == Material.MAGMA_BLOCK
+                || name.contains("LAVA")
+                || name.endsWith("CAMPFIRE")
+                || name.endsWith("FIRE");
+    }
+
+    private Location centeredLobby(Location original, int y) {
+        return new Location(
+                original.getWorld(),
+                original.getBlockX() + 0.5,
+                y,
+                original.getBlockZ() + 0.5,
+                original.getYaw(),
+                original.getPitch()
+        );
     }
 }

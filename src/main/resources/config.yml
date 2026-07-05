@@ -1,10 +1,10 @@
 # ==========================================
 # AcidIsland Config File
-# Optimized2: clean build, async island chunk preload, lighter acid/rain defaults.
+# Oceanfix1: bedrock-free acid ocean, lower monument, async island chunk preload.
 # ==========================================
 
 # Versi template config.
-config-version: 8
+config-version: 9
 
 # Nama world tempat pulau AcidIsland dibuat.
 # acid-world adalah key aktif; world-name tetap dibaca sebagai fallback legacy.

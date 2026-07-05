@@ -100,7 +100,7 @@ public class WorldManager {
             plugin.getLogger().warning("Failed to attach starter sheep leash at " + cx + ", " + cz + ": " + ex.getMessage());
         }
 
-        generateMiniMonument(cx, Math.max(world.getMinHeight() + 12, waterHeight - 22), cz);
+        generateMiniMonument(cx, Math.max(world.getMinHeight() + 16, waterHeight - 34), cz);
     }
 
     public CompletableFuture<Void> preloadStarterIslandChunks(int cx, int cz) {
@@ -187,8 +187,6 @@ public class WorldManager {
                 }
             }
         }
-
-        setBlock(world, cx, waterHeight - 1, cz, Material.BEDROCK);
     }
 
     private void generateNaturalSupports(World world, int cx, int islandY, int cz, int waterHeight, StarterPalette palette) {
@@ -315,44 +313,11 @@ public class WorldManager {
         World world = getAcidWorld();
         Random random = new Random((((long) cx) << 32) ^ cz ^ 0x5A17BEEF);
 
-        int[][] spine = {
-                {-8, -4}, {-7, -4}, {-6, -3}, {-5, -3}, {-4, -2}, {-3, -2},
-                {-2, -1}, {-1, -1}, {0, 0}, {1, 0}, {2, 1}, {3, 1},
-                {4, 2}, {5, 2}, {6, 3}, {7, 3}
-        };
-        for (int i = 0; i < spine.length; i++) {
-            int dx = spine[i][0];
-            int dz = spine[i][1];
-            int width = i % 4 == 0 ? 2 : 1;
-            for (int ox = -width; ox <= width; ox++) {
-                for (int oz = -width; oz <= width; oz++) {
-                    if (Math.abs(ox) + Math.abs(oz) > width + 1) {
-                        continue;
-                    }
-                    Material floor = i % 5 == 0 ? Material.DARK_PRISMARINE : chooseRuinBlock(cx + dx + ox, cz + dz + oz);
-                    setBlock(world, cx + dx + ox, cy - 1, cz + dz + oz, Material.PRISMARINE);
-                    setBlock(world, cx + dx + ox, cy, cz + dz + oz, floor);
-                }
-            }
-        }
-
-        int[][] ribs = {
-                {-6, -5, 3}, {-5, -1, 2}, {-2, -3, 2}, {0, 2, 3}, {3, -1, 2}, {5, 4, 3}
-        };
-        for (int[] rib : ribs) {
-            int height = rib[2];
-            for (int y = 1; y <= height; y++) {
-                setBlock(world, cx + rib[0], cy + y, cz + rib[1], y == height ? Material.PRISMARINE_BRICKS : Material.PRISMARINE);
-            }
-        }
-
-        generateBrokenGateway(world, cx - 8, cy, cz - 4, true);
-        generateBrokenGateway(world, cx + 7, cy, cz + 3, false);
-
-        for (int i = 0; i < 5; i++) {
-            setBlock(world, cx - 3 + i, cy + 2, cz + 2 + i / 2, Material.PRISMARINE_BRICKS);
-        }
-
+        generateSunkenMonumentFoundation(world, cx, cy, cz);
+        generateBrokenGateway(world, cx - 7, cy + 1, cz - 4, true);
+        generateBrokenGateway(world, cx + 5, cy + 1, cz + 4, false);
+        generateBrokenGateway(world, cx - 5, cy + 1, cz + 5, false);
+        generateRuinedPillars(world, cx, cy, cz);
         decorateMiniMonumentAltar(world, cx, cy, cz);
 
         Location chestLoc = new Location(world, cx + 2, cy + 3, cz);
@@ -381,10 +346,55 @@ public class WorldManager {
             }
         }
 
-        for (int i = 0; i < 12; i++) {
-            int x = cx - 9 + random.nextInt(19);
-            int z = cz - 6 + random.nextInt(13);
-            setBlock(world, x, cy - 1 + random.nextInt(2), z, chooseRuinBlock(x, z));
+        for (int i = 0; i < 22; i++) {
+            int x = cx - 10 + random.nextInt(21);
+            int z = cz - 8 + random.nextInt(17);
+            int y = cy - 1 + random.nextInt(3);
+            if (random.nextDouble() < 0.68) {
+                setBlock(world, x, y, z, chooseRuinBlock(x, z));
+            } else {
+                placeSeaPickle(world, x, y + 1, z, 1 + random.nextInt(4));
+            }
+        }
+    }
+
+    private void generateSunkenMonumentFoundation(World world, int cx, int cy, int cz) {
+        for (int dx = -9; dx <= 9; dx++) {
+            for (int dz = -7; dz <= 7; dz++) {
+                double oval = (dx * dx) / 92.0 + (dz * dz) / 52.0;
+                boolean plaza = oval <= 1.0 && coordinateNoise(cx + dx, cz + dz, 91) > 0.08;
+                boolean causeway = Math.abs(dx) <= 1 && Math.abs(dz) <= 8;
+                boolean sideWalk = Math.abs(dz) <= 1 && dx >= -8 && dx <= 8;
+                boolean brokenCorner = Math.abs(dx) > 7 && Math.abs(dz) > 5 && coordinateNoise(cx + dx, cz + dz, 93) < 0.52;
+                if (!((plaza || causeway || sideWalk) && !brokenCorner)) {
+                    continue;
+                }
+
+                Material base = chooseRuinBlock(cx + dx, cz + dz);
+                if ((Math.abs(dx) + Math.abs(dz)) % 7 == 0) {
+                    base = Material.DARK_PRISMARINE;
+                }
+                setBlock(world, cx + dx, cy - 1, cz + dz, Material.PRISMARINE);
+                setBlock(world, cx + dx, cy, cz + dz, base);
+            }
+        }
+    }
+
+    private void generateRuinedPillars(World world, int cx, int cy, int cz) {
+        int[][] pillars = {
+                {-7, -5, 5}, {-4, -6, 3}, {0, -5, 4}, {5, -4, 6}, {8, -1, 3},
+                {-8, 2, 4}, {-5, 5, 6}, {-1, 6, 3}, {4, 5, 5}, {7, 3, 4}
+        };
+        for (int[] pillar : pillars) {
+            int height = pillar[2];
+            for (int y = 1; y <= height; y++) {
+                Material material = y == height ? Material.SEA_LANTERN : (y % 3 == 0 ? Material.PRISMARINE_BRICKS : Material.PRISMARINE);
+                setBlock(world, cx + pillar[0], cy + y, cz + pillar[1], material);
+            }
+            if (height >= 5) {
+                setBlock(world, cx + pillar[0] + 1, cy + height - 1, cz + pillar[1], Material.PRISMARINE_WALL);
+                setBlock(world, cx + pillar[0] - 1, cy + height - 2, cz + pillar[1], Material.DARK_PRISMARINE);
+            }
         }
     }
 
@@ -642,12 +652,9 @@ public class WorldManager {
     }
 
     private void resetColumn(World world, int x, int z, int minY, int maxY, int waterHeight) {
-        int worldMin = world.getMinHeight();
         for (int y = minY; y <= maxY; y++) {
             Material target;
-            if (y == worldMin) {
-                target = Material.BEDROCK;
-            } else if (y <= waterHeight) {
+            if (y <= waterHeight) {
                 target = Material.WATER;
             } else {
                 target = Material.AIR;

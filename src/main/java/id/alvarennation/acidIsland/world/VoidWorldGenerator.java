@@ -24,13 +24,7 @@ public class VoidWorldGenerator extends ChunkGenerator {
         int minHeight = worldInfo.getMinHeight();
         int maxWaterHeight = Math.min(acidWaterHeight, worldInfo.getMaxHeight() - 1);
 
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                chunkData.setBlock(x, minHeight, z, Material.BEDROCK);
-            }
-        }
-
-        for (int y = minHeight + 1; y <= maxWaterHeight; y++) {
+        for (int y = minHeight; y <= maxWaterHeight; y++) {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
                     chunkData.setBlock(x, y, z, Material.WATER);
@@ -71,7 +65,7 @@ public class VoidWorldGenerator extends ChunkGenerator {
 
     @Override
     public void generateBedrock(WorldInfo worldInfo, Random random, int chunkX, int chunkZ, ChunkData chunkData) {
-        // Bedrock is generated in generateNoise so it remains deterministic with the water column.
+        // AcidIsland intentionally has no bedrock floor; the ocean column starts at min build height.
     }
 
     @Override
