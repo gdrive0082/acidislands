@@ -10,6 +10,9 @@ import org.bukkit.entity.Player;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 public class ConfigManager {
 
@@ -27,6 +30,7 @@ public class ConfigManager {
         // Save default config
         plugin.saveDefaultConfig();
         this.config = plugin.getConfig();
+        migrateConfig();
 
         // Save and load messages.yml
         this.messagesFile = new File(plugin.getDataFolder(), "messages.yml");
@@ -39,6 +43,7 @@ public class ConfigManager {
     public void reload() {
         plugin.reloadConfig();
         this.config = plugin.getConfig();
+        migrateConfig();
         this.messages = YamlConfiguration.loadConfiguration(messagesFile);
     }
 
@@ -57,6 +62,49 @@ public class ConfigManager {
             return "acid_island_world";
         }
         return configured;
+    }
+
+    public long getCreateCooldownSeconds() {
+        return getCooldownSeconds("cooldowns.create-seconds");
+    }
+
+    public long getDeleteCooldownSeconds() {
+        return getCooldownSeconds("cooldowns.delete-seconds");
+    }
+
+    private long getCooldownSeconds(String path) {
+        return Math.max(0L, config.getLong(path, 120L));
+    }
+
+    private void migrateConfig() {
+        int previousVersion = config.getInt("config-version", 0);
+        int bundledVersion = 10;
+        try (InputStream defaultsStream = plugin.getResource("config.yml")) {
+            if (defaultsStream != null) {
+                FileConfiguration defaults = YamlConfiguration.loadConfiguration(
+                        new InputStreamReader(defaultsStream, StandardCharsets.UTF_8)
+                );
+                config.setDefaults(defaults);
+                config.options().copyDefaults(true);
+                bundledVersion = defaults.getInt("config-version", bundledVersion);
+            }
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Failed to load bundled config defaults: " + ex.getMessage());
+        }
+
+        migrateCooldown("cooldowns.create-seconds", previousVersion);
+        migrateCooldown("cooldowns.delete-seconds", previousVersion);
+        if (previousVersion < bundledVersion) {
+            config.set("config-version", bundledVersion);
+        }
+        plugin.saveConfig();
+    }
+
+    private void migrateCooldown(String path, int previousVersion) {
+        long value = config.getLong(path, -1L);
+        if (value < 0L || (previousVersion < 10 && value >= 1800L)) {
+            config.set(path, 120L);
+        }
     }
 
     /**

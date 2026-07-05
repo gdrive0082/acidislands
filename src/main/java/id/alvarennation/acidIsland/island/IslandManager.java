@@ -418,8 +418,8 @@ public class IslandManager {
 
     public long getCreateCooldownRemainingMillis(UUID playerUuid) {
         long now = System.currentTimeMillis();
-        long createCooldown = plugin.getConfigManager().getConfig().getLong("cooldowns.create-seconds", 1800L) * 1000L;
-        long deleteCooldown = plugin.getConfigManager().getConfig().getLong("cooldowns.delete-seconds", 1800L) * 1000L;
+        long createCooldown = plugin.getConfigManager().getCreateCooldownSeconds() * 1000L;
+        long deleteCooldown = plugin.getConfigManager().getDeleteCooldownSeconds() * 1000L;
         long lastCreate = lastIslandCreateMillis.getOrDefault(playerUuid, 0L);
         long lastDelete = lastIslandDeleteMillis.getOrDefault(playerUuid, 0L);
         long createRemaining = createCooldown - (now - lastCreate);
@@ -432,7 +432,7 @@ public class IslandManager {
     }
 
     public long getDeleteCooldownRemainingMillis(UUID playerUuid) {
-        long cooldown = plugin.getConfigManager().getConfig().getLong("cooldowns.delete-seconds", 1800L) * 1000L;
+        long cooldown = plugin.getConfigManager().getDeleteCooldownSeconds() * 1000L;
         long lastDelete = lastIslandDeleteMillis.getOrDefault(playerUuid, 0L);
         return Math.max(0L, cooldown - (System.currentTimeMillis() - lastDelete));
     }
