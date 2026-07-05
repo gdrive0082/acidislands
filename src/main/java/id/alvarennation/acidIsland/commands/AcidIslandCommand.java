@@ -123,6 +123,7 @@ public class AcidIslandCommand implements CommandExecutor {
             case "info" -> handleInfo(player);
             case "quest", "quests" -> handleQuestCommand(player, args);
             case "level" -> handleLevel(player, args);
+            case "story" -> handleStoryCommand(player, args, label);
             case "role", "roles" -> handleRoleCommand(player, args, label);
             case "biome", "theme", "themes" -> handleThemeCommand(player, args);
             default -> sendHelp(player, label);
@@ -623,6 +624,34 @@ public class AcidIslandCommand implements CommandExecutor {
         }
     }
 
+    private void handleStoryCommand(Player player, String[] args, String label) {
+        int playerStage = plugin.getIslandManager().getStoryStage(player.getUniqueId());
+        Island island = plugin.getIslandManager().getIslandByPlayer(player.getUniqueId());
+        int islandStage = island == null ? playerStage : plugin.getIslandManager().getIslandStoryStage(island);
+
+        if (args.length == 1) {
+            player.sendMessage(plugin.getConfigManager().format("&b=== &3Story Progress &b==="));
+            player.sendMessage(plugin.getConfigManager().format("&7Stage kamu: &e" + playerStage));
+            player.sendMessage(plugin.getConfigManager().format("&7Stage island/team: &e" + islandStage));
+            player.sendMessage(plugin.getConfigManager().format("&7Gunakan &e/" + label + " story start <conversation> &7untuk mulai dialog ConverseCraft."));
+            return;
+        }
+
+        if (args.length >= 3 && args[1].equalsIgnoreCase("start")) {
+            if (plugin.getConverseCraftHook() == null || !plugin.getConverseCraftHook().isEnabled()) {
+                player.sendMessage(plugin.getConfigManager().format("&cConverseCraft belum aktif di server ini."));
+                return;
+            }
+            boolean started = plugin.getConverseCraftHook().startConversation(player, args[2]);
+            if (!started) {
+                player.sendMessage(plugin.getConfigManager().format("&cConversation &e" + args[2] + " &cgagal dimulai atau tidak ditemukan."));
+            }
+            return;
+        }
+
+        player.sendMessage(plugin.getConfigManager().format("&cPenggunaan: /" + label + " story atau /" + label + " story start <conversation>"));
+    }
+
     private void handleTop(CommandSender sender) {
         List<IslandManager.IslandRanking> top = plugin.getIslandManager().getTopIslands(10);
         sender.sendMessage("§b=== §3Top AcidIsland §b===");
@@ -786,6 +815,7 @@ public class AcidIslandCommand implements CommandExecutor {
         sender.sendMessage("§e/" + label + " bank §7- Deposit/withdraw bank pulau.");
         sender.sendMessage("§e/" + label + " quest §7- Membuka quest pulau.");
         sender.sendMessage("§e/" + label + " level [refresh] §7- Cek level/value island.");
+        sender.sendMessage("§e/" + label + " story [start <conversation>] §7- Cek/mulai story ConverseCraft.");
         sender.sendMessage("§e/" + label + " top §7- Leaderboard island.");
         sender.sendMessage("§e/" + label + " theme §7- Ganti biome/theme island.");
         sender.sendMessage("§e/" + label + " role <player> <role> §7- Atur role member.");

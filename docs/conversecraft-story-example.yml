@@ -23,6 +23,8 @@ dialogues:
   chapter_complete:
     lines:
       - "&aChapter 1 selesai. Generator tier 2 sekarang terbuka untuk island tim kamu."
+      - "&7Native mode: AcidIsland otomatis membaca completion conversation ini lewat mapping config."
     actions:
-      - "console: ai admin story set %player% 1"
       - "sound: entity.player.levelup 1 1"
+      # Fallback jika native mapping dimatikan:
+      # - "console: ai admin story set %player% 1"

@@ -4,6 +4,7 @@ import id.alvarennation.acidIsland.commands.AcidIslandCommand;
 import id.alvarennation.acidIsland.commands.AcidIslandTabCompleter;
 import id.alvarennation.acidIsland.config.ConfigManager;
 import id.alvarennation.acidIsland.gui.IslandGUI;
+import id.alvarennation.acidIsland.hooks.ConverseCraftHook;
 import id.alvarennation.acidIsland.hooks.FloodgateHook;
 import id.alvarennation.acidIsland.hooks.VaultHook;
 import id.alvarennation.acidIsland.island.IslandManager;
@@ -28,6 +29,7 @@ public final class AcidIsland extends JavaPlugin {
     private IslandManager islandManager;
     private IslandGUI islandGUI;
     private QuestManager questManager;
+    private ConverseCraftHook converseCraftHook;
 
     @Override
     public void onEnable() {
@@ -54,6 +56,8 @@ public final class AcidIsland extends JavaPlugin {
         this.islandManager = new IslandManager(this);
         this.questManager = new QuestManager(this);
         this.islandGUI = new IslandGUI(this);
+        this.converseCraftHook = new ConverseCraftHook(this);
+        this.converseCraftHook.setup();
 
         // 4. Register Listeners
         Bukkit.getPluginManager().registerEvents(new AcidListener(this), this);
@@ -106,6 +110,10 @@ public final class AcidIsland extends JavaPlugin {
 
     public QuestManager getQuestManager() {
         return questManager;
+    }
+
+    public ConverseCraftHook getConverseCraftHook() {
+        return converseCraftHook;
     }
 
     public Location getLobbyLocation() {

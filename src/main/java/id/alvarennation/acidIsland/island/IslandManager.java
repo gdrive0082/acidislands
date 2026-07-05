@@ -309,8 +309,16 @@ public class IslandManager {
     }
 
     public void setStoryStage(UUID playerUuid, int stage) {
-        storyStages.put(playerUuid, Math.max(0, stage));
+        int normalizedStage = Math.max(0, stage);
+        storyStages.put(playerUuid, normalizedStage);
         saveData();
+        if (plugin.getConverseCraftHook() != null) {
+            plugin.getConverseCraftHook().syncStoryStage(playerUuid, normalizedStage);
+        }
+    }
+
+    public Map<UUID, Integer> getStoryStagesSnapshot() {
+        return new HashMap<>(storyStages);
     }
 
     public boolean canCreateIsland(UUID playerUuid) {

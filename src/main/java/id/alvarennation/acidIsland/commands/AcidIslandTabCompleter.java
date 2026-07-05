@@ -24,7 +24,7 @@ public class AcidIslandTabCompleter implements TabCompleter {
             "help", "start", "home", "sethome", "setting", "upgrade",
             "vault", "bank", "invite", "accept", "reject", "kick",
             "leave", "delete", "lobby", "info", "quest", "level",
-            "top", "theme", "role", "setlobby", "reload", "admin"
+            "story", "top", "theme", "role", "setlobby", "reload", "admin"
     );
 
     public AcidIslandTabCompleter(AcidIsland plugin) {
@@ -45,6 +45,7 @@ public class AcidIslandTabCompleter implements TabCompleter {
                 case "accept" -> filter(List.of("confirm"), args[1]);
                 case "quest", "quests" -> filter(List.of("claim"), args[1]);
                 case "level" -> filter(List.of("refresh"), args[1]);
+                case "story" -> filter(List.of("start"), args[1]);
                 case "theme", "themes", "biome" -> filter(getThemeIds(), args[1]);
                 case "admin" -> filter(List.of("delete", "reset", "tp", "story"), args[1]);
                 default -> new ArrayList<>();
@@ -57,6 +58,9 @@ public class AcidIslandTabCompleter implements TabCompleter {
             }
             if (sub.equals("quest") || sub.equals("quests")) {
                 return args[1].equalsIgnoreCase("claim") ? filter(plugin.getQuestManager().getQuestIds(), args[2]) : new ArrayList<>();
+            }
+            if (sub.equals("story")) {
+                return args[1].equalsIgnoreCase("start") ? filter(getStoryConversationIds(), args[2]) : new ArrayList<>();
             }
             if (sub.equals("role") || sub.equals("roles")) {
                 return filter(List.of("member", "trusted", "co_owner"), args[2]);
@@ -100,6 +104,16 @@ public class AcidIslandTabCompleter implements TabCompleter {
                 ids.add(key);
             }
         }
+        return ids;
+    }
+
+    private List<String> getStoryConversationIds() {
+        ConfigurationSection section = plugin.getConfigManager().getConfig().getConfigurationSection("integrations.conversecraft.story-stage-conversations");
+        List<String> ids = new ArrayList<>();
+        if (section == null) {
+            return ids;
+        }
+        ids.addAll(section.getKeys(false));
         return ids;
     }
 

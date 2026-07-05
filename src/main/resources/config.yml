@@ -48,6 +48,26 @@ acid-rain:
   # Interval damage dalam detik
   damage-interval: 1
 
+# Integrasi plugin eksternal.
+integrations:
+  conversecraft:
+    enabled: true
+    # Jika conversation dengan nama di bawah selesai normal, story-stage player naik otomatis.
+    sync-stage-from-completed-conversations: true
+    # Saat story-stage AcidIsland berubah, flag ConverseCraft ikut diset:
+    # acidisland.story.stage.1, acidisland.story.stage.2, dst.
+    sync-flags-to-conversecraft: true
+    only-increase-stage: true
+    notify-stage-up: true
+    flag-prefix: "acidisland.story.stage."
+    max-stage-flags: 10
+    story-stage-conversations:
+      acidisland_chapter_1: 1
+      acidisland_chapter_2: 2
+      acidisland_chapter_3: 3
+  ultracosmetics:
+    enabled: true
+
 # Starter Island Configuration
 starters:
   classic:

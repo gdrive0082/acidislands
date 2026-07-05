@@ -62,6 +62,8 @@ permissions:
     default: true
   acidisland.command.level:
     default: true
+  acidisland.command.story:
+    default: true
   acidisland.command.top:
     default: true
   acidisland.command.theme:
