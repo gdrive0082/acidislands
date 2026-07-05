@@ -1,0 +1,49 @@
+# ==========================================
+# AcidIsland Messages File
+# ==========================================
+
+prefixes:
+  java: "&b&l[&9AI Java&b&l] &r"
+  bedrock: "&a&l[&2AI Bedrock&a&l] &r"
+
+messages:
+  no-permission: "&cKamu tidak punya izin untuk melakukan ini!"
+  only-players: "&cPerintah ini hanya bisa dijalankan oleh player!"
+  teleport-lobby: "&aTeleportasi ke lobby..."
+  
+  already-has-island: "&cKamu sudah memiliki pulau! Gunakan /ai home untuk pergi ke pulaumu."
+  no-island: "&cKamu tidak memiliki pulau! Gunakan /ai start untuk membuat pulau baru."
+  island-created: "&aPulau kamu berhasil dibuat! Selamat bertahan hidup!"
+  island-deleted: "&cPulau kamu berhasil dihapus!"
+  teleport-home: "&aTeleportasi ke rumah pulau..."
+  home-set: "&aHome pulau berhasil diatur!"
+  not-on-island: "&cKamu harus berada di dalam area pulau kamu untuk melakukan ini!"
+  
+  invite-sent: "&aUndangan dikirim ke &e{player}&a!"
+  invite-received: "&e{player} &amengundangmu untuk bergabung dengan pulaunya. Gunakan &b/ai accept &aatau &c/ai reject&a."
+  invite-no-pending: "&cKamu tidak memiliki undangan aktif."
+  invite-accepted: "&aKamu telah bergabung dengan pulau &e{owner}&a!"
+  invite-accepted-owner: "&e{player} &atelah menerima undangan dan bergabung dengan pulaumu!"
+  invite-rejected: "&cKamu menolak undangan bergabung."
+  invite-rejected-owner: "&e{player} &amenolak undangan bergabung ke pulaumu."
+  invite-already-member: "&cPlayer tersebut sudah menjadi anggota pulaumu."
+  invite-max-members: "&cKapasitas anggota pulau kamu sudah penuh! Upgrade kapasitas di /ai upgrade."
+  
+  kick-success: "&aBerhasil mengeluarkan &e{player} &adari pulau!"
+  kick-failed: "&cPlayer &e{player} &abukan anggota dari pulaumu."
+  kick-notification: "&cKamu telah dikeluarkan dari pulau oleh owner."
+  
+  leave-success: "&aKamu berhasil meninggalkan pulau."
+  leave-owner: "&cOwner tidak bisa meninggalkan pulau! Gunakan /ai delete untuk menghapus pulau."
+  
+  bank-deposit-success: "&aBerhasil menabung &a${amount} &ake bank pulau!"
+  bank-deposit-fail: "&cUang kamu tidak cukup atau bank penuh!"
+  bank-withdraw-success: "&aBerhasil mengambil &a${amount} &adari bank pulau!"
+  bank-withdraw-fail: "&cSaldo bank tidak cukup!"
+  bank-info: "&7Saldo Bank: &e${balance}&7 / &e${limit}"
+  
+  upgrade-success: "&aBerhasil mengupgrade &e{upgrade} &ake level &e{level}&a!"
+  upgrade-fail-money: "&cUang kamu tidak cukup! Butuh &a${cost}&c."
+  upgrade-max-level: "&cUpgrade ini sudah mencapai level maksimal!"
+  
+  gui-premium-only: "&cFitur ini hanya untuk member Premium! Beli premium untuk membuka."
