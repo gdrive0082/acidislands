@@ -42,6 +42,7 @@ public class Island {
     private long cachedIslandValue = -1L;
     private int cachedIslandLevel = 0;
     private long lastLevelScanMillis = 0L;
+    private boolean levelScanInProgress = false;
 
     public Island(UUID owner, int x, int z) {
         this.owner = owner;
@@ -259,6 +260,14 @@ public class Island {
 
     public long getLastLevelScanMillis() {
         return lastLevelScanMillis;
+    }
+
+    public boolean isLevelScanInProgress() {
+        return levelScanInProgress;
+    }
+
+    public void setLevelScanInProgress(boolean levelScanInProgress) {
+        this.levelScanInProgress = levelScanInProgress;
     }
 
     public void setLevelCache(long value, int level) {

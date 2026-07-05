@@ -18,6 +18,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import net.milkbowl.vault.economy.EconomyResponse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -328,6 +329,10 @@ public class IslandGUI implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (!(event.getInventory().getHolder() instanceof AcidIslandHolder holder)) return;
 
+        if (holder.getGuiType().equals("vault")) {
+            return;
+        }
+
         event.setCancelled(true); // Batalkan semua pemindahan item di GUI kita
 
         int slot = event.getRawSlot();
@@ -491,7 +496,11 @@ public class IslandGUI implements Listener {
             }
 
             // Bayar
-            VaultHook.getEconomy().withdrawPlayer(player, cost);
+            EconomyResponse response = VaultHook.getEconomy().withdrawPlayer(player, cost);
+            if (!response.transactionSuccess()) {
+                player.sendMessage(plugin.getConfigManager().format("&cPembayaran upgrade gagal: " + response.errorMessage));
+                return;
+            }
             island.setLevel(type, nextLvl);
             plugin.getIslandManager().saveData();
 
@@ -553,6 +562,7 @@ public class IslandGUI implements Listener {
             case REQUIREMENTS_NOT_MET -> player.sendMessage(plugin.getConfigManager().format("&cRequirement quest belum terpenuhi."));
             case NOT_FOUND -> player.sendMessage(plugin.getConfigManager().format("&cQuest tidak ditemukan."));
             case NO_ISLAND -> player.sendMessage(plugin.getConfigManager().getMessage(player, "no-island"));
+            case REWARD_FAILED -> player.sendMessage(plugin.getConfigManager().format("&cReward quest gagal diproses. Coba lagi nanti."));
         }
     }
 
@@ -575,6 +585,10 @@ public class IslandGUI implements Listener {
             player.sendMessage(plugin.getConfigManager().format("&cTheme tidak ditemukan."));
             return;
         }
+        if (!plugin.getWorldManager().isThemeValid(normalized)) {
+            player.sendMessage(plugin.getConfigManager().format("&cTheme gagal diterapkan. Cek nama biome di config."));
+            return;
+        }
         if (island.getTheme().equalsIgnoreCase(normalized)) {
             player.sendMessage(plugin.getConfigManager().format("&cIsland kamu sudah memakai theme ini."));
             return;
@@ -590,7 +604,11 @@ public class IslandGUI implements Listener {
                 player.sendMessage(plugin.getConfigManager().format("&cUang kamu tidak cukup. Butuh $" + cost + "."));
                 return;
             }
-            VaultHook.getEconomy().withdrawPlayer(player, cost);
+            EconomyResponse response = VaultHook.getEconomy().withdrawPlayer(player, cost);
+            if (!response.transactionSuccess()) {
+                player.sendMessage(plugin.getConfigManager().format("&cPembayaran theme gagal: " + response.errorMessage));
+                return;
+            }
         }
 
         if (plugin.getWorldManager().applyIslandTheme(island, normalized)) {

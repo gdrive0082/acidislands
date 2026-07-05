@@ -7,16 +7,20 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 public class AcidListener implements Listener {
 
     private final AcidIsland plugin;
+    private final Map<UUID, Long> lastWaterDamage = new HashMap<>();
+    private final Map<UUID, Long> lastRainDamage = new HashMap<>();
 
     public AcidListener(AcidIsland plugin) {
         this.plugin = plugin;
@@ -36,6 +40,7 @@ public class AcidListener implements Listener {
                 boolean waterEnabled = config.getBoolean("acid-water.enabled", true);
                 int waterHeight = config.getInt("acid-water.height", 62);
                 double waterDamage = config.getDouble("acid-water.damage-amount", 4.0);
+                long waterIntervalMillis = Math.max(1, config.getInt("acid-water.damage-interval", 1)) * 1000L;
 
                 boolean poisonEnabled = config.getBoolean("acid-water.poison-effect.enabled", true);
                 int poisonDuration = config.getInt("acid-water.poison-effect.duration-seconds", 3) * 20;
@@ -43,8 +48,10 @@ public class AcidListener implements Listener {
 
                 boolean rainEnabled = config.getBoolean("acid-rain.enabled", true);
                 double rainDamage = config.getDouble("acid-rain.damage-amount", 1.0);
+                long rainIntervalMillis = Math.max(1, config.getInt("acid-rain.damage-interval", 1)) * 1000L;
 
                 boolean hasStorm = world.hasStorm();
+                long now = System.currentTimeMillis();
 
                 for (Player player : world.getPlayers()) {
                     if (player.getGameMode() == org.bukkit.GameMode.CREATIVE || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
@@ -60,18 +67,20 @@ public class AcidListener implements Listener {
                     
                     // 2. Toxic Water Check
                     if (waterEnabled) {
-                        BlockFaceCheck:
                         if (loc.getY() <= waterHeight + 1) {
                             Material feetType = loc.getBlock().getType();
                             Material headType = player.getEyeLocation().getBlock().getType();
                             
                             if (feetType == Material.WATER || headType == Material.WATER) {
-                                // Apply Water Acid Damage
-                                player.damage(waterDamage);
-                                if (poisonEnabled) {
-                                    player.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonDuration, poisonAmp));
+                                long lastDamage = lastWaterDamage.getOrDefault(player.getUniqueId(), 0L);
+                                if (now - lastDamage >= waterIntervalMillis) {
+                                    player.damage(waterDamage);
+                                    lastWaterDamage.put(player.getUniqueId(), now);
+                                    if (poisonEnabled) {
+                                        player.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonDuration, poisonAmp));
+                                    }
                                 }
-                                break BlockFaceCheck; // Already got water damage, skip rain
+                                continue; // Water damage has priority over rain damage.
                             }
                         }
                     }
@@ -81,8 +90,11 @@ public class AcidListener implements Listener {
                         // Check if player is exposed to the sky
                         int highestY = world.getHighestBlockYAt(loc.getBlockX(), loc.getBlockZ());
                         if (highestY <= loc.getY()) {
-                            // Player is exposed to rain
-                            player.damage(rainDamage);
+                            long lastDamage = lastRainDamage.getOrDefault(player.getUniqueId(), 0L);
+                            if (now - lastDamage >= rainIntervalMillis) {
+                                player.damage(rainDamage);
+                                lastRainDamage.put(player.getUniqueId(), now);
+                            }
                         }
                     }
                 }

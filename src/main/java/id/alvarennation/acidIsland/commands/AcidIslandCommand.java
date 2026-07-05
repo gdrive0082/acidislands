@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import net.milkbowl.vault.economy.EconomyResponse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -300,7 +301,11 @@ public class AcidIslandCommand implements CommandExecutor {
                 return;
             }
 
-            VaultHook.getEconomy().withdrawPlayer(player, amount);
+            EconomyResponse response = VaultHook.getEconomy().withdrawPlayer(player, amount);
+            if (!response.transactionSuccess()) {
+                player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-deposit-fail"));
+                return;
+            }
             island.setBankBalance(island.getBankBalance() + amount);
             plugin.getIslandManager().saveData();
             player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-deposit-success", "{amount}", String.valueOf(amount)));
@@ -317,8 +322,12 @@ public class AcidIslandCommand implements CommandExecutor {
                 return;
             }
 
+            EconomyResponse response = VaultHook.getEconomy().depositPlayer(player, amount);
+            if (!response.transactionSuccess()) {
+                player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-withdraw-fail"));
+                return;
+            }
             island.setBankBalance(island.getBankBalance() - amount);
-            VaultHook.getEconomy().depositPlayer(player, amount);
             plugin.getIslandManager().saveData();
             player.sendMessage(plugin.getConfigManager().getMessage(player, "bank-withdraw-success", "{amount}", String.valueOf(amount)));
             return;
@@ -551,6 +560,7 @@ public class AcidIslandCommand implements CommandExecutor {
             case REQUIREMENTS_NOT_MET -> player.sendMessage(plugin.getConfigManager().format("&cRequirement quest belum terpenuhi."));
             case NOT_FOUND -> player.sendMessage(plugin.getConfigManager().format("&cQuest tidak ditemukan."));
             case NO_ISLAND -> player.sendMessage(plugin.getConfigManager().getMessage(player, "no-island"));
+            case REWARD_FAILED -> player.sendMessage(plugin.getConfigManager().format("&cReward quest gagal diproses. Coba lagi nanti."));
         }
     }
 
@@ -563,6 +573,9 @@ public class AcidIslandCommand implements CommandExecutor {
         long value = plugin.getIslandManager().getIslandValue(island, refresh);
         int level = plugin.getIslandManager().getIslandLevel(island, false);
         player.sendMessage(plugin.getConfigManager().format("&7Island Level: &e" + level + " &7(Value: &e" + value + "&7)"));
+        if (island.isLevelScanInProgress()) {
+            player.sendMessage(plugin.getConfigManager().format("&7Value sedang dihitung ulang bertahap. Angka di atas memakai cache terakhir."));
+        }
     }
 
     private void handleTop(CommandSender sender) {
@@ -635,6 +648,10 @@ public class AcidIslandCommand implements CommandExecutor {
             player.sendMessage(plugin.getConfigManager().format("&cTheme tidak ditemukan."));
             return;
         }
+        if (!plugin.getWorldManager().isThemeValid(normalized)) {
+            player.sendMessage(plugin.getConfigManager().format("&cTheme gagal diterapkan. Cek nama biome di config."));
+            return;
+        }
         if (island.getTheme().equalsIgnoreCase(normalized)) {
             player.sendMessage(plugin.getConfigManager().format("&cIsland kamu sudah memakai theme ini."));
             return;
@@ -650,7 +667,11 @@ public class AcidIslandCommand implements CommandExecutor {
                 player.sendMessage(plugin.getConfigManager().format("&cUang kamu tidak cukup. Butuh $" + cost + "."));
                 return;
             }
-            VaultHook.getEconomy().withdrawPlayer(player, cost);
+            EconomyResponse response = VaultHook.getEconomy().withdrawPlayer(player, cost);
+            if (!response.transactionSuccess()) {
+                player.sendMessage(plugin.getConfigManager().format("&cPembayaran theme gagal: " + response.errorMessage));
+                return;
+            }
         }
 
         if (plugin.getWorldManager().applyIslandTheme(island, normalized)) {

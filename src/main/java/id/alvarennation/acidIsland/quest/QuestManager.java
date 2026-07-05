@@ -8,6 +8,7 @@ import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import net.milkbowl.vault.economy.EconomyResponse;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -89,8 +90,14 @@ public class QuestManager {
         }
 
         double rewardMoney = getRewardMoney(questId);
-        if (rewardMoney > 0 && VaultHook.hasEconomy()) {
-            VaultHook.getEconomy().depositPlayer(player, rewardMoney);
+        if (rewardMoney > 0) {
+            if (!VaultHook.hasEconomy()) {
+                return ClaimResult.REWARD_FAILED;
+            }
+            EconomyResponse response = VaultHook.getEconomy().depositPlayer(player, rewardMoney);
+            if (!response.transactionSuccess()) {
+                return ClaimResult.REWARD_FAILED;
+            }
         }
 
         OfflinePlayer owner = Bukkit.getOfflinePlayer(island.getOwner());
@@ -151,6 +158,7 @@ public class QuestManager {
         NO_ISLAND,
         NOT_FOUND,
         ALREADY_COMPLETED,
-        REQUIREMENTS_NOT_MET
+        REQUIREMENTS_NOT_MET,
+        REWARD_FAILED
     }
 }

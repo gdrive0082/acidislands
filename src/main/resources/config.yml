@@ -222,6 +222,7 @@ level:
   cache-seconds: 300
   scan-min-y: 63
   scan-max-y: 160
+  blocks-per-tick: 5000
   default-block-value: 1
   block-values:
     COBBLESTONE: 1

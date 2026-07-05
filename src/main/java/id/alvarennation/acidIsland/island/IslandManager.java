@@ -25,6 +25,7 @@ public class IslandManager {
     private final Map<UUID, Island> islandsByOwner = new HashMap<>();
     private final Map<UUID, UUID> memberToOwnerMap = new HashMap<>();
     private final Map<UUID, UUID> pendingInvites = new HashMap<>();
+    private final Map<String, Island> islandsByGrid = new HashMap<>();
 
     private int nextGridIndex = 0;
 
@@ -38,6 +39,7 @@ public class IslandManager {
         islandsByOwner.clear();
         memberToOwnerMap.clear();
         pendingInvites.clear();
+        islandsByGrid.clear();
 
         if (!dataFile.exists()) {
             try {
@@ -109,6 +111,7 @@ public class IslandManager {
             island.setBankBalance(section.getDouble(key + ".bank", 0.0));
             island.setVaultBase64(section.getString(key + ".vault", ""));
             islandsByOwner.put(ownerUuid, island);
+            indexIsland(island);
         }
     }
 
@@ -196,6 +199,7 @@ public class IslandManager {
         Island island = new Island(ownerUuid, cx, cz);
         island.setTheme(type);
         islandsByOwner.put(ownerUuid, island);
+        indexIsland(island);
         plugin.getWorldManager().applyIslandTheme(island, type);
         saveData();
 
@@ -211,6 +215,7 @@ public class IslandManager {
         if (island == null) {
             return null;
         }
+        removeIslandIndex(island);
 
         for (UUID memberUuid : island.getMembers()) {
             memberToOwnerMap.remove(memberUuid);
@@ -269,12 +274,17 @@ public class IslandManager {
         String wName = plugin.getConfigManager().getConfig().getString("world-name", "acid_island_world");
         if (!loc.getWorld().getName().equals(wName)) return null;
 
-        for (Island island : islandsByOwner.values()) {
-            int borderSize = getBorderSize(island);
-            double half = borderSize / 2.0;
-            if (loc.getX() >= island.getX() - half && loc.getX() <= island.getX() + half
-                    && loc.getZ() >= island.getZ() - half && loc.getZ() <= island.getZ() + half) {
-                return island;
+        int spacing = getIslandSpacing();
+        int gridX = gridCoordinate(loc.getX(), spacing);
+        int gridZ = gridCoordinate(loc.getZ(), spacing);
+        int searchRadius = Math.max(1, (int) Math.ceil((getMaxConfiguredBorderSize() / 2.0) / spacing) + 1);
+
+        for (int dx = -searchRadius; dx <= searchRadius; dx++) {
+            for (int dz = -searchRadius; dz <= searchRadius; dz++) {
+                Island island = islandsByGrid.get(gridKey(gridX + dx, gridZ + dz));
+                if (island != null && isInsideIslandBounds(loc, island)) {
+                    return island;
+                }
             }
         }
         return null;
@@ -291,11 +301,8 @@ public class IslandManager {
         if (!forceRefresh && island.getCachedIslandValue() >= 0 && cacheAge < cacheSeconds * 1000L) {
             return island.getCachedIslandValue();
         }
-        long value = plugin.getWorldManager().calculateIslandValue(island);
-        int pointsPerLevel = Math.max(1, plugin.getConfigManager().getConfig().getInt("level.points-per-level", 100));
-        int level = (int) Math.max(0, value / pointsPerLevel);
-        island.setLevelCache(value, level);
-        return value;
+        plugin.getWorldManager().scheduleIslandValueScan(island);
+        return Math.max(0L, island.getCachedIslandValue());
     }
 
     public int getIslandLevel(Island island, boolean forceRefresh) {
@@ -336,6 +343,47 @@ public class IslandManager {
         }
         offset -= legLength;
         return new int[]{layer, layer - offset};
+    }
+
+    private void indexIsland(Island island) {
+        int spacing = getIslandSpacing();
+        islandsByGrid.put(gridKey(gridCoordinate(island.getX(), spacing), gridCoordinate(island.getZ(), spacing)), island);
+    }
+
+    private void removeIslandIndex(Island island) {
+        int spacing = getIslandSpacing();
+        islandsByGrid.remove(gridKey(gridCoordinate(island.getX(), spacing), gridCoordinate(island.getZ(), spacing)), island);
+    }
+
+    private boolean isInsideIslandBounds(Location loc, Island island) {
+        int borderSize = getBorderSize(island);
+        double half = borderSize / 2.0;
+        return loc.getX() >= island.getX() - half && loc.getX() <= island.getX() + half
+                && loc.getZ() >= island.getZ() - half && loc.getZ() <= island.getZ() + half;
+    }
+
+    private int getIslandSpacing() {
+        return Math.max(1, plugin.getConfigManager().getConfig().getInt("island-spacing", 400));
+    }
+
+    private int getMaxConfiguredBorderSize() {
+        ConfigurationSection section = plugin.getConfigManager().getConfig().getConfigurationSection("upgrades.border");
+        if (section == null) {
+            return 50;
+        }
+        int max = 50;
+        for (String key : section.getKeys(false)) {
+            max = Math.max(max, section.getInt(key + ".size", 50));
+        }
+        return max;
+    }
+
+    private int gridCoordinate(double coordinate, int spacing) {
+        return (int) Math.round(coordinate / spacing);
+    }
+
+    private String gridKey(int gridX, int gridZ) {
+        return gridX + ":" + gridZ;
     }
 
     public record IslandRanking(Island island, long value, int level) {

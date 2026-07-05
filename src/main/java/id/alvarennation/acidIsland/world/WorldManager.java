@@ -21,6 +21,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 
 public class WorldManager {
@@ -262,47 +263,74 @@ public class WorldManager {
         }.runTaskTimer(plugin, 1L, 1L);
     }
 
-    public long calculateIslandValue(Island island) {
+    public void scheduleIslandValueScan(Island island) {
+        if (island == null || island.isLevelScanInProgress()) {
+            return;
+        }
+
         World world = getAcidWorld();
         FileConfiguration config = plugin.getConfigManager().getConfig();
         int borderSize = plugin.getIslandManager().getBorderSize(island);
         int half = borderSize / 2;
+        int minX = island.getX() - half;
+        int maxX = island.getX() + half;
+        int minZ = island.getZ() - half;
+        int maxZ = island.getZ() + half;
         int minY = Math.max(world.getMinHeight(), config.getInt("level.scan-min-y", 63));
         int maxY = Math.min(world.getMaxHeight() - 1, config.getInt("level.scan-max-y", 160));
         long defaultValue = config.getLong("level.default-block-value", 1L);
         ConfigurationSection values = config.getConfigurationSection("level.block-values");
+        int blocksPerTick = Math.max(1, config.getInt("level.blocks-per-tick", 5000));
+        int pointsPerLevel = Math.max(1, config.getInt("level.points-per-level", 100));
 
-        long value = 0L;
-        for (int x = island.getX() - half; x <= island.getX() + half; x++) {
-            for (int z = island.getZ() - half; z <= island.getZ() + half; z++) {
-                for (int y = minY; y <= maxY; y++) {
+        if (maxY < minY) {
+            island.setLevelCache(0L, 0);
+            return;
+        }
+
+        island.setLevelScanInProgress(true);
+        new BukkitRunnable() {
+            private int x = minX;
+            private int z = minZ;
+            private int y = minY;
+            private long value = 0L;
+
+            @Override
+            public void run() {
+                int processed = 0;
+                while (processed < blocksPerTick) {
                     Material material = world.getBlockAt(x, y, z).getType();
-                    if (material.isAir() || material == Material.WATER || material == Material.BEDROCK) {
-                        continue;
+                    value += getBlockValue(material, values, defaultValue);
+                    processed++;
+
+                    y++;
+                    if (y > maxY) {
+                        y = minY;
+                        z++;
                     }
-                    value += values == null ? defaultValue : values.getLong(material.name(), defaultValue);
+                    if (z > maxZ) {
+                        z = minZ;
+                        x++;
+                    }
+                    if (x > maxX) {
+                        int level = (int) Math.max(0, value / pointsPerLevel);
+                        island.setLevelCache(value, level);
+                        island.setLevelScanInProgress(false);
+                        cancel();
+                        return;
+                    }
                 }
             }
-        }
-        return value;
+        }.runTaskTimer(plugin, 1L, 1L);
     }
 
     public boolean applyIslandTheme(Island island, String themeId) {
+        Biome biome = getThemeBiome(themeId);
+        if (biome == null) {
+            return false;
+        }
+
         FileConfiguration config = plugin.getConfigManager().getConfig();
-        String path = "themes." + themeId;
-        if (config.getConfigurationSection(path) == null) {
-            return false;
-        }
-
-        String biomeName = config.getString(path + ".biome", "PLAINS");
-        Biome biome;
-        try {
-            biome = Biome.valueOf(biomeName.toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            plugin.getLogger().warning("Invalid biome '" + biomeName + "' for theme " + themeId + ".");
-            return false;
-        }
-
         World world = getAcidWorld();
         int borderSize = plugin.getIslandManager().getBorderSize(island);
         int half = borderSize / 2;
@@ -342,6 +370,10 @@ public class WorldManager {
         return true;
     }
 
+    public boolean isThemeValid(String themeId) {
+        return getThemeBiome(themeId) != null;
+    }
+
     private void resetColumn(World world, int x, int z, int minY, int maxY, int waterHeight) {
         int worldMin = world.getMinHeight();
         for (int y = minY; y <= maxY; y++) {
@@ -367,6 +399,29 @@ public class WorldManager {
             if (!(entity instanceof Player)) {
                 entity.remove();
             }
+        }
+    }
+
+    private long getBlockValue(Material material, ConfigurationSection values, long defaultValue) {
+        if (material.isAir() || material == Material.WATER || material == Material.BEDROCK) {
+            return 0L;
+        }
+        return values == null ? defaultValue : values.getLong(material.name(), defaultValue);
+    }
+
+    private Biome getThemeBiome(String themeId) {
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        String path = "themes." + themeId;
+        if (config.getConfigurationSection(path) == null) {
+            return null;
+        }
+
+        String biomeName = config.getString(path + ".biome", "PLAINS");
+        try {
+            return Biome.valueOf(biomeName.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            plugin.getLogger().warning("Invalid biome '" + biomeName + "' for theme " + themeId + ".");
+            return null;
         }
     }
 }
