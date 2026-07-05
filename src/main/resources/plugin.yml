@@ -1,5 +1,5 @@
 name: AcidIsland
-version: '1.0-SNAPSHOT'
+version: '1.0-syncfix4-optimized2'
 main: id.alvarennation.acidIsland.AcidIsland
 api-version: '1.21'
 softdepend:
@@ -22,6 +22,15 @@ commands:
 permissions:
   acidisland.admin:
     description: Access all AcidIsland admin commands.
+    default: op
+  acidisland.admin.config:
+    description: Access configuration-focused admin actions.
+    default: op
+  acidisland.admin.manage:
+    description: Access island and player management admin actions.
+    default: op
+  acidisland.admin.bypass:
+    description: Bypass island protection checks.
     default: op
   acidisland.premium:
     description: Access premium island settings.

@@ -31,11 +31,12 @@ public class AcidListener implements Listener {
     }
 
     private void startAcidTask() {
+        long taskInterval = Math.max(20L, plugin.getConfigManager().getConfig().getLong("optimization.acid-task-interval-ticks", 20L));
         new BukkitRunnable() {
             @Override
             public void run() {
                 FileConfiguration config = plugin.getConfigManager().getConfig();
-                String worldName = config.getString("world-name", "acid_island_world");
+                String worldName = plugin.getConfigManager().getAcidWorldName();
                 World world = Bukkit.getWorld(worldName);
                 
                 if (world == null) return;
@@ -106,7 +107,7 @@ public class AcidListener implements Listener {
                     }
                 }
             }
-        }.runTaskTimer(plugin, 20L, 20L); // Run every 1 second (20 ticks)
+        }.runTaskTimer(plugin, taskInterval, taskInterval);
     }
 
     @EventHandler

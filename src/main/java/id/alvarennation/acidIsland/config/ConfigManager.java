@@ -50,6 +50,15 @@ public class ConfigManager {
         return messages;
     }
 
+    public String getAcidWorldName() {
+        String legacy = config.getString("world-name", "acid_island_world");
+        String configured = config.getString("acid-world", legacy);
+        if (configured == null || configured.isBlank() || configured.equalsIgnoreCase("world")) {
+            return "acid_island_world";
+        }
+        return configured;
+    }
+
     /**
      * Get translated Component message for a player, prepended with Java/Bedrock prefix.
      */

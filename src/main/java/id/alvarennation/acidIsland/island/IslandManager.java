@@ -439,7 +439,7 @@ public class IslandManager {
 
     public Island getIslandAt(Location loc) {
         if (loc == null || loc.getWorld() == null) return null;
-        String wName = plugin.getConfigManager().getConfig().getString("world-name", "acid_island_world");
+        String wName = plugin.getConfigManager().getAcidWorldName();
         if (!loc.getWorld().getName().equals(wName)) return null;
 
         int spacing = getIslandSpacing();

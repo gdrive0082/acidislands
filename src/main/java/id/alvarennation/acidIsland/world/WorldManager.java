@@ -41,7 +41,7 @@ public class WorldManager {
     }
 
     public void initWorld() {
-        String worldName = plugin.getConfigManager().getConfig().getString("world-name", "acid_island_world");
+        String worldName = plugin.getConfigManager().getAcidWorldName();
         int waterHeight = plugin.getConfigManager().getConfig().getInt("acid-water.height", 62);
 
         WorldCreator creator = new WorldCreator(worldName);

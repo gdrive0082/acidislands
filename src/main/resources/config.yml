@@ -1,8 +1,14 @@
 # ==========================================
 # AcidIsland Config File
+# Optimized2: clean build, async island chunk preload, lighter acid/rain defaults.
 # ==========================================
 
-# Nama world tempat pulau AcidIsland dibuat
+# Versi template config.
+config-version: 8
+
+# Nama world tempat pulau AcidIsland dibuat.
+# acid-world adalah key aktif; world-name tetap dibaca sebagai fallback legacy.
+acid-world: "acid_island_world"
 world-name: "acid_island_world"
 
 # Jarak antar pulau dalam block (agar border tidak bertubrukan)
@@ -33,20 +39,25 @@ acid-water:
   # Damage yang diberikan setiap interval (2.0 = 1 heart)
   damage-amount: 4.0
   # Interval damage dalam detik
-  damage-interval: 1
+  damage-interval: 2
   # Apakah memberi efek poison?
   poison-effect:
-    enabled: true
+    enabled: false
     duration-seconds: 3
     amplifier: 1
 
 # Pengaturan hujan asam (Acid Rain)
 acid-rain:
-  enabled: true
+  enabled: false
   # Damage yang diberikan setiap interval (2.0 = 1 heart)
   damage-amount: 1.0
   # Interval damage dalam detik
-  damage-interval: 1
+  damage-interval: 3
+
+# Optimasi runtime ringan.
+optimization:
+  # Interval pengecekan acid/rain. 40 tick = 2 detik.
+  acid-task-interval-ticks: 40
 
 # Integrasi plugin eksternal.
 integrations:
