@@ -1,0 +1,28 @@
+name: acidisland_chapter_1
+settings:
+  cooldown: 1m
+  display-mode: CHAT
+  reward-once: true
+  typewriter:
+    enabled: true
+    speed: 2
+    sound: BLOCK_NOTE_BLOCK_HAT
+entry: intro
+
+dialogues:
+  intro:
+    lines:
+      - "&bPenjaga Rift: &fKamu sudah siap membuka potensi generator island?"
+      - "&7Selesaikan dialog ini sebagai contoh akhir Chapter 1."
+    options:
+      lanjut:
+        text: "&a[Lanjut]"
+        goto: chapter_complete
+        default: true
+
+  chapter_complete:
+    lines:
+      - "&aChapter 1 selesai. Generator tier 2 sekarang terbuka untuk island tim kamu."
+    actions:
+      - "console: ai admin story set %player% 1"
+      - "sound: entity.player.levelup 1 1"

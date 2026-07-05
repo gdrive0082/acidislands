@@ -156,8 +156,12 @@ public class AcidIslandCommand implements CommandExecutor {
             sender.sendMessage("§cKamu tidak punya izin untuk melakukan ini!");
             return;
         }
+        if (args.length >= 2 && args[1].equalsIgnoreCase("story")) {
+            handleAdminStory(sender, args, label);
+            return;
+        }
         if (args.length < 3) {
-            sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp> <player>");
+            sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp> <player> atau /" + label + " admin story <set|get|add> <player> [stage]");
             return;
         }
 
@@ -203,7 +207,57 @@ public class AcidIslandCommand implements CommandExecutor {
                 plugin.getWorldManager().applyWorldBorder(adminPlayer, island);
                 adminPlayer.sendMessage(plugin.getConfigManager().format("&aTeleport ke island " + args[2] + "."));
             }
-            default -> sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp> <player>");
+            default -> sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp> <player> atau /" + label + " admin story <set|get|add> <player> [stage]");
+        }
+    }
+
+    private void handleAdminStory(CommandSender sender, String[] args, String label) {
+        if (args.length < 4) {
+            sender.sendMessage("§cPenggunaan: /" + label + " admin story <set|get|add> <player> [stage]");
+            return;
+        }
+
+        String action = args[2].toLowerCase(Locale.ROOT);
+        OfflinePlayer target = Bukkit.getOfflinePlayer(args[3]);
+        UUID targetUuid = target.getUniqueId();
+        String targetName = target.getName() == null ? args[3] : target.getName();
+
+        if (action.equals("get")) {
+            sender.sendMessage("§aStory stage " + targetName + ": §e" + plugin.getIslandManager().getStoryStage(targetUuid));
+            return;
+        }
+
+        if (args.length < 5) {
+            sender.sendMessage("§cPenggunaan: /" + label + " admin story " + action + " <player> <stage>");
+            return;
+        }
+
+        int value;
+        try {
+            value = Integer.parseInt(args[4]);
+            if (value < 0) {
+                throw new NumberFormatException();
+            }
+        } catch (NumberFormatException ex) {
+            sender.sendMessage("§cStage harus angka 0 atau lebih besar.");
+            return;
+        }
+
+        int newStage;
+        if (action.equals("set")) {
+            newStage = value;
+        } else if (action.equals("add")) {
+            newStage = plugin.getIslandManager().getStoryStage(targetUuid) + value;
+        } else {
+            sender.sendMessage("§cPenggunaan: /" + label + " admin story <set|get|add> <player> [stage]");
+            return;
+        }
+
+        plugin.getIslandManager().setStoryStage(targetUuid, newStage);
+        sender.sendMessage("§aStory stage " + targetName + " diset ke §e" + newStage + "§a.");
+        Player onlineTarget = target.getPlayer();
+        if (onlineTarget != null) {
+            onlineTarget.sendMessage(plugin.getConfigManager().format("&aStory progress kamu sekarang stage &e" + newStage + "&a."));
         }
     }
 
@@ -738,6 +792,7 @@ public class AcidIslandCommand implements CommandExecutor {
         sender.sendMessage("§e/" + label + " invite/kick/leave/delete/lobby §7- Manajemen island.");
         if (hasAdminPermission(sender)) {
             sender.sendMessage("§c/" + label + " setlobby, reload, admin <delete|reset|tp> <player>");
+            sender.sendMessage("§c/" + label + " admin story <set|get|add> <player> [stage]");
         }
     }
 }

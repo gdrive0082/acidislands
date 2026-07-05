@@ -195,12 +195,14 @@ upgrades:
         COBBLESTONE: 100.0
     2:
       cost: 2000
+      story-stage: 1
       rates:
         COBBLESTONE: 85.0
         COAL_ORE: 10.0
         IRON_ORE: 5.0
     3:
       cost: 5000
+      story-stage: 2
       rates:
         COBBLESTONE: 70.0
         COAL_ORE: 15.0
@@ -209,6 +211,7 @@ upgrades:
         LAPIS_ORE: 2.0
     4:
       cost: 12000
+      story-stage: 3
       rates:
         COBBLESTONE: 55.0
         COAL_ORE: 15.0

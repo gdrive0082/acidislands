@@ -28,6 +28,7 @@ public class IslandManager {
     private final Map<String, Island> islandsByGrid = new HashMap<>();
     private final Map<UUID, Long> lastIslandCreateMillis = new HashMap<>();
     private final Map<UUID, Long> lastIslandDeleteMillis = new HashMap<>();
+    private final Map<UUID, Integer> storyStages = new HashMap<>();
 
     private int nextGridIndex = 0;
 
@@ -44,6 +45,7 @@ public class IslandManager {
         islandsByGrid.clear();
         lastIslandCreateMillis.clear();
         lastIslandDeleteMillis.clear();
+        storyStages.clear();
 
         if (!dataFile.exists()) {
             try {
@@ -58,6 +60,7 @@ public class IslandManager {
                 plugin.getConfigManager().getConfig().getInt("island-start-grid-index", 1)
         );
         loadCooldowns();
+        loadPlayerProgress();
 
         ConfigurationSection section = dataConfig.getConfigurationSection("islands");
         if (section == null) {
@@ -138,6 +141,7 @@ public class IslandManager {
     public void saveData() {
         dataConfig.set("next-grid-index", nextGridIndex);
         saveCooldowns();
+        savePlayerProgress();
 
         for (Map.Entry<UUID, Island> entry : islandsByOwner.entrySet()) {
             UUID ownerUuid = entry.getKey();
@@ -290,6 +294,23 @@ public class IslandManager {
 
     public void removeInvite(UUID invited) {
         pendingInvites.remove(invited);
+    }
+
+    public int getStoryStage(UUID playerUuid) {
+        return storyStages.getOrDefault(playerUuid, 0);
+    }
+
+    public int getIslandStoryStage(Island island) {
+        int highest = getStoryStage(island.getOwner());
+        for (UUID memberUuid : island.getMembers()) {
+            highest = Math.max(highest, getStoryStage(memberUuid));
+        }
+        return highest;
+    }
+
+    public void setStoryStage(UUID playerUuid, int stage) {
+        storyStages.put(playerUuid, Math.max(0, stage));
+        saveData();
     }
 
     public boolean canCreateIsland(UUID playerUuid) {
@@ -458,6 +479,29 @@ public class IslandManager {
         }
         for (Map.Entry<UUID, Long> entry : lastIslandDeleteMillis.entrySet()) {
             dataConfig.set("cooldowns." + entry.getKey() + ".last-delete", entry.getValue());
+        }
+    }
+
+    private void loadPlayerProgress() {
+        ConfigurationSection section = dataConfig.getConfigurationSection("players");
+        if (section == null) {
+            return;
+        }
+
+        for (String key : section.getKeys(false)) {
+            try {
+                UUID uuid = UUID.fromString(key);
+                storyStages.put(uuid, Math.max(0, section.getInt(key + ".story-stage", 0)));
+            } catch (IllegalArgumentException ex) {
+                plugin.getLogger().warning("Skipping invalid player UUID in islands.yml: " + key);
+            }
+        }
+    }
+
+    private void savePlayerProgress() {
+        dataConfig.set("players", null);
+        for (Map.Entry<UUID, Integer> entry : storyStages.entrySet()) {
+            dataConfig.set("players." + entry.getKey() + ".story-stage", Math.max(0, entry.getValue()));
         }
     }
 

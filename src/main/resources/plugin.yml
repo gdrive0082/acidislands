@@ -13,6 +13,8 @@ softdepend:
   - MMOItems
   - ModelEngine
   - PlaceholderAPI
+  - UltraCosmetics
+  - ConverseCraft
 commands:
   ai:
     description: Main AcidIsland command

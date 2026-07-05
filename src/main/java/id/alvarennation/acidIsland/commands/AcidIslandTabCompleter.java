@@ -46,7 +46,7 @@ public class AcidIslandTabCompleter implements TabCompleter {
                 case "quest", "quests" -> filter(List.of("claim"), args[1]);
                 case "level" -> filter(List.of("refresh"), args[1]);
                 case "theme", "themes", "biome" -> filter(getThemeIds(), args[1]);
-                case "admin" -> filter(List.of("delete", "reset", "tp"), args[1]);
+                case "admin" -> filter(List.of("delete", "reset", "tp", "story"), args[1]);
                 default -> new ArrayList<>();
             };
         }
@@ -61,9 +61,21 @@ public class AcidIslandTabCompleter implements TabCompleter {
             if (sub.equals("role") || sub.equals("roles")) {
                 return filter(List.of("member", "trusted", "co_owner"), args[2]);
             }
+            if (sub.equals("admin") && args[1].equalsIgnoreCase("story")) {
+                return filter(List.of("set", "get", "add"), args[2]);
+            }
             if (sub.equals("admin")) {
                 return onlinePlayerNames(sender, args[2]);
             }
+        }
+
+        if (args.length == 4 && sub.equals("admin") && args[1].equalsIgnoreCase("story")) {
+            return onlinePlayerNames(sender, args[3]);
+        }
+
+        if (args.length == 5 && sub.equals("admin") && args[1].equalsIgnoreCase("story")
+                && (args[2].equalsIgnoreCase("set") || args[2].equalsIgnoreCase("add"))) {
+            return filter(List.of("0", "1", "2", "3", "4", "5"), args[4]);
         }
 
         return new ArrayList<>();

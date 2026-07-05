@@ -242,6 +242,13 @@ public class IslandGUI implements Listener {
             lore.add("&7Level berikutnya: &6Tier " + nextLvl);
             lore.add("&7Kapasitas berikutnya: &6" + nextLimitStr);
             lore.add("&7Biaya Upgrade: &a$" + cost);
+            if (type.equals("generator")) {
+                int requiredStage = config.getInt("upgrades.generator." + nextLvl + ".story-stage", 0);
+                if (requiredStage > 0) {
+                    int currentStage = plugin.getIslandManager().getIslandStoryStage(island);
+                    lore.add("&7Syarat Story: &dStage " + requiredStage + " &7(sekarang &e" + currentStage + "&7)");
+                }
+            }
             lore.add(" ");
             lore.add("&eKlik kiri untuk upgrade!");
         }
@@ -523,6 +530,15 @@ public class IslandGUI implements Listener {
             }
 
             double cost = config.getDouble("upgrades." + type + "." + nextLvl + ".cost");
+            if (type.equals("generator")) {
+                int requiredStage = config.getInt("upgrades.generator." + nextLvl + ".story-stage", 0);
+                int currentStage = plugin.getIslandManager().getIslandStoryStage(island);
+                if (currentStage < requiredStage) {
+                    player.sendMessage(plugin.getConfigManager().format("&cGenerator tier ini butuh story stage &e" + requiredStage + "&c. Stage island sekarang &e" + currentStage + "&c."));
+                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                    return;
+                }
+            }
 
             if (!VaultHook.hasEconomy()) {
                 player.sendMessage(plugin.getConfigManager().format("&cEcon system not connected!"));
