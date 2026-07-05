@@ -40,7 +40,7 @@ public class IslandProtectionListener implements Listener {
                     Island island = plugin.getIslandManager().getIslandAt(player.getLocation());
                     if (island != null) {
                         UUID uuid = player.getUniqueId();
-                        boolean isMember = island.getOwner().equals(uuid) || island.getMembers().contains(uuid);
+                        boolean isMember = island.isMember(uuid);
 
                         // 1. Weather Lock
                         if (island.getPremiumSetting("weather-lock")) {
@@ -141,7 +141,7 @@ public class IslandProtectionListener implements Listener {
         if (island == null) return;
 
         UUID uuid = player.getUniqueId();
-        boolean isMember = island.getOwner().equals(uuid) || island.getMembers().contains(uuid);
+        boolean isMember = island.isMember(uuid);
 
         if (!isMember) {
             if (!island.getBasicSetting("block-break")) {
@@ -160,7 +160,7 @@ public class IslandProtectionListener implements Listener {
         if (island == null) return;
 
         UUID uuid = player.getUniqueId();
-        boolean isMember = island.getOwner().equals(uuid) || island.getMembers().contains(uuid);
+        boolean isMember = island.isMember(uuid);
 
         if (!isMember) {
             if (!island.getBasicSetting("block-place")) {
@@ -180,7 +180,7 @@ public class IslandProtectionListener implements Listener {
         if (island == null) return;
 
         UUID uuid = player.getUniqueId();
-        boolean isMember = island.getOwner().equals(uuid) || island.getMembers().contains(uuid);
+        boolean isMember = island.isMember(uuid);
 
         if (!isMember) {
             Material type = event.getClickedBlock().getType();

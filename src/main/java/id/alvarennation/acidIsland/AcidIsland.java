@@ -10,11 +10,11 @@ import id.alvarennation.acidIsland.island.IslandManager;
 import id.alvarennation.acidIsland.listeners.AcidListener;
 import id.alvarennation.acidIsland.listeners.GeneratorListener;
 import id.alvarennation.acidIsland.listeners.IslandProtectionListener;
+import id.alvarennation.acidIsland.quest.QuestManager;
 import id.alvarennation.acidIsland.world.WorldManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class AcidIsland extends JavaPlugin {
@@ -23,7 +23,7 @@ public final class AcidIsland extends JavaPlugin {
     private WorldManager worldManager;
     private IslandManager islandManager;
     private IslandGUI islandGUI;
-    private Location lobbyLocation;
+    private QuestManager questManager;
 
     @Override
     public void onEnable() {
@@ -48,6 +48,7 @@ public final class AcidIsland extends JavaPlugin {
         this.worldManager.initWorld(); // Load/Create toxic ocean world
 
         this.islandManager = new IslandManager(this);
+        this.questManager = new QuestManager(this);
         this.islandGUI = new IslandGUI(this);
 
         // 4. Register Listeners
@@ -91,7 +92,33 @@ public final class AcidIsland extends JavaPlugin {
         return islandGUI;
     }
 
+    public QuestManager getQuestManager() {
+        return questManager;
+    }
+
     public Location getLobbyLocation() {
-        return Bukkit.getWorlds().get(0).getSpawnLocation();
+        String worldName = getConfigManager().getConfig().getString("lobby.world", "");
+        World world = Bukkit.getWorld(worldName);
+        if (world == null) {
+            return Bukkit.getWorlds().get(0).getSpawnLocation();
+        }
+        return new Location(
+                world,
+                getConfigManager().getConfig().getDouble("lobby.x", world.getSpawnLocation().getX()),
+                getConfigManager().getConfig().getDouble("lobby.y", world.getSpawnLocation().getY()),
+                getConfigManager().getConfig().getDouble("lobby.z", world.getSpawnLocation().getZ()),
+                (float) getConfigManager().getConfig().getDouble("lobby.yaw", 0.0),
+                (float) getConfigManager().getConfig().getDouble("lobby.pitch", 0.0)
+        );
+    }
+
+    public void setLobbyLocation(Location location) {
+        getConfigManager().getConfig().set("lobby.world", location.getWorld().getName());
+        getConfigManager().getConfig().set("lobby.x", location.getX());
+        getConfigManager().getConfig().set("lobby.y", location.getY());
+        getConfigManager().getConfig().set("lobby.z", location.getZ());
+        getConfigManager().getConfig().set("lobby.yaw", location.getYaw());
+        getConfigManager().getConfig().set("lobby.pitch", location.getPitch());
+        saveConfig();
     }
 }

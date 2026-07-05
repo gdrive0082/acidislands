@@ -76,6 +76,21 @@ public class PlaceholderHook {
                 case "generator_level" -> {
                     return island != null ? String.valueOf(island.getLevel("generator")) : "1";
                 }
+                case "island_level" -> {
+                    return island != null ? String.valueOf(plugin.getIslandManager().getIslandLevel(island, false)) : "0";
+                }
+                case "island_value" -> {
+                    return island != null ? String.valueOf(plugin.getIslandManager().getIslandValue(island, false)) : "0";
+                }
+                case "theme" -> {
+                    return island != null ? island.getTheme() : "-";
+                }
+                case "role" -> {
+                    return island != null ? island.getRole(player.getUniqueId()).getDisplayName() : "Visitor";
+                }
+                case "quests_completed" -> {
+                    return island != null ? String.valueOf(island.getCompletedQuests().size()) : "0";
+                }
             }
 
             return null;

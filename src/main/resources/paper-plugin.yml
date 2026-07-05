@@ -38,5 +38,52 @@ commands:
   ai:
     description: Main AcidIsland command
     aliases: [ia]
-
-
+permissions:
+  acidisland.admin:
+    description: Access all AcidIsland admin commands.
+    default: op
+  acidisland.premium:
+    description: Access premium island settings.
+    default: false
+  acidisland.command.help:
+    default: true
+  acidisland.command.start:
+    default: true
+  acidisland.command.home:
+    default: true
+  acidisland.command.sethome:
+    default: true
+  acidisland.command.settings:
+    default: true
+  acidisland.command.upgrade:
+    default: true
+  acidisland.command.vault:
+    default: true
+  acidisland.command.bank:
+    default: true
+  acidisland.command.invite:
+    default: true
+  acidisland.command.accept:
+    default: true
+  acidisland.command.reject:
+    default: true
+  acidisland.command.kick:
+    default: true
+  acidisland.command.leave:
+    default: true
+  acidisland.command.delete:
+    default: true
+  acidisland.command.lobby:
+    default: true
+  acidisland.command.info:
+    default: true
+  acidisland.command.quest:
+    default: true
+  acidisland.command.level:
+    default: true
+  acidisland.command.top:
+    default: true
+  acidisland.command.theme:
+    default: true
+  acidisland.command.role:
+    default: true

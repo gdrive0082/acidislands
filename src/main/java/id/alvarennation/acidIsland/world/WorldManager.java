@@ -3,9 +3,12 @@ package id.alvarennation.acidIsland.world;
 import id.alvarennation.acidIsland.AcidIsland;
 import id.alvarennation.acidIsland.island.Island;
 import org.bukkit.*;
+import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LeashHitch;
 import org.bukkit.entity.Player;
@@ -15,6 +18,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.List;
 import java.util.Random;
@@ -209,5 +213,160 @@ public class WorldManager {
         border.setDamageAmount(0.2);
         border.setDamageBuffer(2.0);
         player.setWorldBorder(border);
+    }
+
+    public void scheduleIslandCleanup(Island island) {
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        if (!config.getBoolean("cleanup.enabled", true)) {
+            return;
+        }
+
+        World world = getAcidWorld();
+        int borderSize = plugin.getIslandManager().getBorderSize(island);
+        int padding = config.getInt("cleanup.padding", 8);
+        int half = (int) Math.ceil(borderSize / 2.0) + padding;
+        int minX = island.getX() - half;
+        int maxX = island.getX() + half;
+        int minZ = island.getZ() - half;
+        int maxZ = island.getZ() + half;
+        int waterHeight = config.getInt("acid-water.height", 62);
+        int minY = Math.max(world.getMinHeight(), config.getInt("cleanup.min-y", world.getMinHeight()));
+        int maxY = Math.min(world.getMaxHeight() - 1, config.getInt("cleanup.max-y", 160));
+        int columnsPerTick = Math.max(1, config.getInt("cleanup.columns-per-tick", 12));
+
+        removeNonPlayerEntities(world, island.getX(), island.getZ(), half, minY, maxY);
+
+        new BukkitRunnable() {
+            private int x = minX;
+            private int z = minZ;
+
+            @Override
+            public void run() {
+                int processed = 0;
+                while (processed < columnsPerTick) {
+                    resetColumn(world, x, z, minY, maxY, waterHeight);
+                    processed++;
+
+                    z++;
+                    if (z > maxZ) {
+                        z = minZ;
+                        x++;
+                    }
+                    if (x > maxX) {
+                        cancel();
+                        plugin.getLogger().info("Finished cleaning island at " + island.getX() + ", " + island.getZ() + ".");
+                        return;
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+    public long calculateIslandValue(Island island) {
+        World world = getAcidWorld();
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        int borderSize = plugin.getIslandManager().getBorderSize(island);
+        int half = borderSize / 2;
+        int minY = Math.max(world.getMinHeight(), config.getInt("level.scan-min-y", 63));
+        int maxY = Math.min(world.getMaxHeight() - 1, config.getInt("level.scan-max-y", 160));
+        long defaultValue = config.getLong("level.default-block-value", 1L);
+        ConfigurationSection values = config.getConfigurationSection("level.block-values");
+
+        long value = 0L;
+        for (int x = island.getX() - half; x <= island.getX() + half; x++) {
+            for (int z = island.getZ() - half; z <= island.getZ() + half; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    Material material = world.getBlockAt(x, y, z).getType();
+                    if (material.isAir() || material == Material.WATER || material == Material.BEDROCK) {
+                        continue;
+                    }
+                    value += values == null ? defaultValue : values.getLong(material.name(), defaultValue);
+                }
+            }
+        }
+        return value;
+    }
+
+    public boolean applyIslandTheme(Island island, String themeId) {
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        String path = "themes." + themeId;
+        if (config.getConfigurationSection(path) == null) {
+            return false;
+        }
+
+        String biomeName = config.getString(path + ".biome", "PLAINS");
+        Biome biome;
+        try {
+            biome = Biome.valueOf(biomeName.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            plugin.getLogger().warning("Invalid biome '" + biomeName + "' for theme " + themeId + ".");
+            return false;
+        }
+
+        World world = getAcidWorld();
+        int borderSize = plugin.getIslandManager().getBorderSize(island);
+        int half = borderSize / 2;
+        int columnsPerTick = Math.max(1, config.getInt("themes.columns-per-tick", 32));
+        int minX = island.getX() - half;
+        int maxX = island.getX() + half;
+        int minZ = island.getZ() - half;
+        int maxZ = island.getZ() + half;
+
+        new BukkitRunnable() {
+            private int x = minX;
+            private int z = minZ;
+
+            @Override
+            public void run() {
+                int processed = 0;
+                while (processed < columnsPerTick) {
+                    world.setBiome(x, z, biome);
+                    processed++;
+
+                    z++;
+                    if (z > maxZ) {
+                        z = minZ;
+                        x++;
+                    }
+                    if (x > maxX) {
+                        cancel();
+                        return;
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
+
+        island.setTheme(themeId);
+        island.invalidateLevelCache();
+        plugin.getIslandManager().saveData();
+        return true;
+    }
+
+    private void resetColumn(World world, int x, int z, int minY, int maxY, int waterHeight) {
+        int worldMin = world.getMinHeight();
+        for (int y = minY; y <= maxY; y++) {
+            Material target;
+            if (y == worldMin) {
+                target = Material.BEDROCK;
+            } else if (y <= waterHeight) {
+                target = Material.WATER;
+            } else {
+                target = Material.AIR;
+            }
+            Block block = world.getBlockAt(x, y, z);
+            if (block.getType() != target) {
+                block.setType(target, false);
+            }
+        }
+    }
+
+    private void removeNonPlayerEntities(World world, int centerX, int centerZ, int half, int minY, int maxY) {
+        Location center = new Location(world, centerX, (minY + maxY) / 2.0, centerZ);
+        double yRadius = Math.max(1, (maxY - minY) / 2.0);
+        for (Entity entity : world.getNearbyEntities(center, half, yRadius, half)) {
+            if (!(entity instanceof Player)) {
+                entity.remove();
+            }
+        }
     }
 }

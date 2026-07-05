@@ -1,6 +1,5 @@
 package id.alvarennation.acidIsland.island;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.inventory.ItemStack;
@@ -9,48 +8,52 @@ import org.bukkit.util.io.BukkitObjectOutputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.util.*;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 public class Island {
 
     private final UUID owner;
     private final Set<UUID> members = new HashSet<>();
+    private final Map<UUID, IslandRole> memberRoles = new HashMap<>();
     private final int x;
     private final int z;
-    
-    // Home location
+
     private double homeX;
     private double homeY;
     private double homeZ;
     private float homeYaw;
     private float homePitch;
 
-    // Upgrades
     private final Map<String, Integer> levels = new HashMap<>();
-
-    // Settings
     private final Map<String, Boolean> basicSettings = new HashMap<>();
     private final Map<String, Boolean> premiumSettings = new HashMap<>();
+    private final Set<String> completedQuests = new HashSet<>();
 
-    // Bank
     private double bankBalance;
-
-    // Vault Base64 Content
     private String vaultBase64 = "";
+    private String theme = "classic";
+
+    private long cachedIslandValue = -1L;
+    private int cachedIslandLevel = 0;
+    private long lastLevelScanMillis = 0L;
 
     public Island(UUID owner, int x, int z) {
         this.owner = owner;
         this.x = x;
         this.z = z;
-        
-        // Default home
+
         this.homeX = x;
         this.homeY = 76;
         this.homeZ = z;
         this.homeYaw = 0;
         this.homePitch = 0;
 
-        // Default levels
         levels.put("border", 1);
         levels.put("members", 1);
         levels.put("vault", 1);
@@ -58,22 +61,20 @@ public class Island {
         levels.put("bank", 1);
         levels.put("generator", 1);
 
-        // Default basic settings
         basicSettings.put("pvp", false);
         basicSettings.put("mob-spawn", true);
         basicSettings.put("animal-spawn", true);
-        basicSettings.put("block-break", false); // non-members break
-        basicSettings.put("block-place", false); // non-members place
-        basicSettings.put("chest-open", false);  // non-members chest open
-        basicSettings.put("interaction", false); // non-members buttons/doors
+        basicSettings.put("block-break", false);
+        basicSettings.put("block-place", false);
+        basicSettings.put("chest-open", false);
+        basicSettings.put("interaction", false);
 
-        // Default premium settings
-        premiumSettings.put("creeper-explosion", false); // false = creeper blocks not destroyed
+        premiumSettings.put("creeper-explosion", false);
         premiumSettings.put("enderman-grief", false);
         premiumSettings.put("fire-spread", false);
         premiumSettings.put("leaf-decay", true);
-        premiumSettings.put("weather-lock", false); // lock to sun/clear
-        premiumSettings.put("time-lock", false);    // false = regular day/night cycle
+        premiumSettings.put("weather-lock", false);
+        premiumSettings.put("time-lock", false);
         premiumSettings.put("keep-inventory", false);
         premiumSettings.put("fly-mode", false);
         premiumSettings.put("mob-damage", true);
@@ -88,6 +89,10 @@ public class Island {
 
     public Set<UUID> getMembers() {
         return members;
+    }
+
+    public Map<UUID, IslandRole> getMemberRoles() {
+        return memberRoles;
     }
 
     public int getX() {
@@ -110,12 +115,74 @@ public class Island {
         this.homePitch = loc.getPitch();
     }
 
+    public boolean isOwner(UUID uuid) {
+        return owner.equals(uuid);
+    }
+
+    public boolean isMember(UUID uuid) {
+        return owner.equals(uuid) || members.contains(uuid);
+    }
+
+    public IslandRole getRole(UUID uuid) {
+        if (owner.equals(uuid)) {
+            return IslandRole.OWNER;
+        }
+        if (!members.contains(uuid)) {
+            return IslandRole.VISITOR;
+        }
+        return memberRoles.getOrDefault(uuid, IslandRole.MEMBER);
+    }
+
+    public boolean hasRole(UUID uuid, IslandRole role) {
+        return getRole(uuid).atLeast(role);
+    }
+
+    public boolean canManage(UUID uuid) {
+        return hasRole(uuid, IslandRole.CO_OWNER);
+    }
+
+    public boolean canUseBank(UUID uuid) {
+        return hasRole(uuid, IslandRole.CO_OWNER);
+    }
+
+    public boolean canChangeRoles(UUID uuid) {
+        return isOwner(uuid);
+    }
+
+    public void addMember(UUID memberUuid) {
+        addMember(memberUuid, IslandRole.MEMBER);
+    }
+
+    public void addMember(UUID memberUuid, IslandRole role) {
+        members.add(memberUuid);
+        memberRoles.put(memberUuid, role == IslandRole.OWNER ? IslandRole.CO_OWNER : role);
+    }
+
+    public void removeMember(UUID memberUuid) {
+        members.remove(memberUuid);
+        memberRoles.remove(memberUuid);
+    }
+
+    public void setMemberRole(UUID memberUuid, IslandRole role) {
+        if (members.contains(memberUuid)) {
+            memberRoles.put(memberUuid, role == IslandRole.OWNER ? IslandRole.CO_OWNER : role);
+        }
+    }
+
+    public Set<UUID> getParticipants() {
+        Set<UUID> participants = new LinkedHashSet<>();
+        participants.add(owner);
+        participants.addAll(members);
+        return participants;
+    }
+
     public int getLevel(String upgradeType) {
         return levels.getOrDefault(upgradeType, 1);
     }
 
     public void setLevel(String upgradeType, int level) {
         levels.put(upgradeType, level);
+        invalidateLevelCache();
     }
 
     public Map<String, Integer> getLevels() {
@@ -162,7 +229,48 @@ public class Island {
         this.vaultBase64 = vaultBase64;
     }
 
-    // Helper serialization
+    public String getTheme() {
+        return theme;
+    }
+
+    public void setTheme(String theme) {
+        this.theme = theme == null || theme.isBlank() ? "classic" : theme.toLowerCase();
+    }
+
+    public Set<String> getCompletedQuests() {
+        return completedQuests;
+    }
+
+    public boolean hasCompletedQuest(String questId) {
+        return completedQuests.contains(questId.toLowerCase());
+    }
+
+    public void completeQuest(String questId) {
+        completedQuests.add(questId.toLowerCase());
+    }
+
+    public long getCachedIslandValue() {
+        return cachedIslandValue;
+    }
+
+    public int getCachedIslandLevel() {
+        return cachedIslandLevel;
+    }
+
+    public long getLastLevelScanMillis() {
+        return lastLevelScanMillis;
+    }
+
+    public void setLevelCache(long value, int level) {
+        this.cachedIslandValue = value;
+        this.cachedIslandLevel = level;
+        this.lastLevelScanMillis = System.currentTimeMillis();
+    }
+
+    public void invalidateLevelCache() {
+        this.lastLevelScanMillis = 0L;
+    }
+
     public static String itemStackArrayToBase64(ItemStack[] items) {
         try {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();

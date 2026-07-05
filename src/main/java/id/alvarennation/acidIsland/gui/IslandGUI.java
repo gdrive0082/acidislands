@@ -8,6 +8,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -20,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 public class IslandGUI implements Listener {
@@ -254,6 +256,71 @@ public class IslandGUI implements Listener {
     }
 
     // ==========================================
+    // 7. Quest GUI
+    // ==========================================
+    public void openQuestsGUI(Player player, Island island) {
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("quests", island), 54, plugin.getConfigManager().format("&a&lIsland Quests"));
+        List<String> questIds = plugin.getQuestManager().getQuestIds();
+
+        for (int i = 0; i < Math.min(questIds.size(), inv.getSize()); i++) {
+            String questId = questIds.get(i);
+            boolean completed = island.hasCompletedQuest(questId);
+            boolean claimable = plugin.getQuestManager().canClaim(island, questId);
+            Material icon = completed ? Material.LIME_CONCRETE : claimable ? Material.EMERALD : plugin.getQuestManager().getIcon(questId);
+
+            List<String> lore = new ArrayList<>();
+            lore.addAll(plugin.getQuestManager().getDescription(questId));
+            lore.add(" ");
+            lore.addAll(plugin.getQuestManager().getRequirementLore(island, questId));
+            double rewardMoney = plugin.getQuestManager().getRewardMoney(questId);
+            if (rewardMoney > 0) {
+                lore.add(" ");
+                lore.add("&7Reward: &a$" + rewardMoney);
+            }
+            lore.add(" ");
+            if (completed) {
+                lore.add("&aSelesai");
+            } else if (claimable) {
+                lore.add("&eKlik untuk claim.");
+            } else {
+                lore.add("&cRequirement belum terpenuhi.");
+            }
+
+            inv.setItem(i, createGuiItem(icon, plugin.getQuestManager().getDisplayName(questId), lore.toArray(new String[0])));
+        }
+
+        fillFiller(inv);
+        player.openInventory(inv);
+    }
+
+    // ==========================================
+    // 8. Theme GUI
+    // ==========================================
+    public void openThemesGUI(Player player, Island island) {
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("themes", island), 27, plugin.getConfigManager().format("&b&lIsland Themes"));
+        List<String> themeIds = getThemeIds();
+
+        for (int i = 0; i < Math.min(themeIds.size(), inv.getSize()); i++) {
+            String themeId = themeIds.get(i);
+            String path = "themes." + themeId;
+            Material icon = Material.matchMaterial(plugin.getConfigManager().getConfig().getString(path + ".icon", "GRASS_BLOCK"));
+            if (icon == null) icon = Material.GRASS_BLOCK;
+            boolean current = island.getTheme().equalsIgnoreCase(themeId);
+            double cost = plugin.getConfigManager().getConfig().getDouble(path + ".cost", 0.0);
+            inv.setItem(i, createGuiItem(
+                    icon,
+                    plugin.getConfigManager().getConfig().getString(path + ".display-name", themeId),
+                    "&7Biome: &e" + plugin.getConfigManager().getConfig().getString(path + ".biome", "PLAINS"),
+                    "&7Biaya: &a$" + cost,
+                    current ? "&aSedang dipakai" : "&eKlik untuk memakai theme ini."
+            ));
+        }
+
+        fillFiller(inv);
+        player.openInventory(inv);
+    }
+
+    // ==========================================
     // Click Listener Handler
     // ==========================================
     @EventHandler
@@ -281,6 +348,10 @@ public class IslandGUI implements Listener {
             handleUpgradesClick(player, island, slot);
         } else if (guiType.equals("confirm_delete")) {
             handleDeleteConfirmClick(player, island, slot);
+        } else if (guiType.equals("quests")) {
+            handleQuestsClick(player, island, slot);
+        } else if (guiType.equals("themes")) {
+            handleThemesClick(player, island, slot);
         }
     }
 
@@ -315,8 +386,7 @@ public class IslandGUI implements Listener {
     }
 
     private void handleBasicSettingsClick(Player player, Island island, int slot) {
-        // Cek owner
-        if (!island.getOwner().equals(player.getUniqueId())) {
+        if (!island.canManage(player.getUniqueId())) {
             player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
             player.closeInventory();
             return;
@@ -342,8 +412,7 @@ public class IslandGUI implements Listener {
     }
 
     private void handlePremiumSettingsClick(Player player, Island island, int slot) {
-        // Cek owner
-        if (!island.getOwner().equals(player.getUniqueId())) {
+        if (!island.canManage(player.getUniqueId())) {
             player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
             player.closeInventory();
             return;
@@ -380,7 +449,7 @@ public class IslandGUI implements Listener {
     }
 
     private void handleUpgradesClick(Player player, Island island, int slot) {
-        if (!island.getOwner().equals(player.getUniqueId())) {
+        if (!island.canManage(player.getUniqueId())) {
             player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
             player.closeInventory();
             return;
@@ -456,21 +525,105 @@ public class IslandGUI implements Listener {
             player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
             
             // Delete
-            plugin.getIslandManager().deleteIsland(player.getUniqueId());
+            Island deleted = plugin.getIslandManager().deleteIsland(player.getUniqueId());
             player.sendMessage(plugin.getConfigManager().getMessage(player, "island-deleted"));
-            
-            // Teleport to lobby
-            player.setWorldBorder(null);
-            Location lobbyLoc = plugin.getLobbyLocation();
-            if (lobbyLoc != null) {
-                player.teleport(lobbyLoc);
-            } else {
-                player.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
+
+            if (deleted != null) {
+                teleportParticipantsToLobby(deleted);
             }
         } else if (slot == 15) {
             // Cancel
             player.closeInventory();
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+        }
+    }
+
+    private void handleQuestsClick(Player player, Island island, int slot) {
+        List<String> questIds = plugin.getQuestManager().getQuestIds();
+        if (slot < 0 || slot >= questIds.size()) return;
+
+        String questId = questIds.get(slot);
+        switch (plugin.getQuestManager().claim(player, island, questId)) {
+            case CLAIMED -> {
+                player.sendMessage(plugin.getConfigManager().format("&aQuest &e" + plugin.getQuestManager().getDisplayName(questId) + " &aberhasil diklaim."));
+                openQuestsGUI(player, island);
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.2f);
+            }
+            case ALREADY_COMPLETED -> player.sendMessage(plugin.getConfigManager().format("&cQuest ini sudah selesai."));
+            case REQUIREMENTS_NOT_MET -> player.sendMessage(plugin.getConfigManager().format("&cRequirement quest belum terpenuhi."));
+            case NOT_FOUND -> player.sendMessage(plugin.getConfigManager().format("&cQuest tidak ditemukan."));
+            case NO_ISLAND -> player.sendMessage(plugin.getConfigManager().getMessage(player, "no-island"));
+        }
+    }
+
+    private void handleThemesClick(Player player, Island island, int slot) {
+        if (!island.canManage(player.getUniqueId())) {
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
+            player.closeInventory();
+            return;
+        }
+
+        List<String> themeIds = getThemeIds();
+        if (slot < 0 || slot >= themeIds.size()) return;
+        changeTheme(player, island, themeIds.get(slot));
+    }
+
+    private void changeTheme(Player player, Island island, String themeId) {
+        String normalized = themeId.toLowerCase(Locale.ROOT);
+        String path = "themes." + normalized;
+        if (plugin.getConfigManager().getConfig().getConfigurationSection(path) == null) {
+            player.sendMessage(plugin.getConfigManager().format("&cTheme tidak ditemukan."));
+            return;
+        }
+        if (island.getTheme().equalsIgnoreCase(normalized)) {
+            player.sendMessage(plugin.getConfigManager().format("&cIsland kamu sudah memakai theme ini."));
+            return;
+        }
+
+        double cost = plugin.getConfigManager().getConfig().getDouble(path + ".cost", 0.0);
+        if (cost > 0) {
+            if (!VaultHook.hasEconomy()) {
+                player.sendMessage(plugin.getConfigManager().format("&cEconomy system belum tersambung!"));
+                return;
+            }
+            if (VaultHook.getEconomy().getBalance(player) < cost) {
+                player.sendMessage(plugin.getConfigManager().format("&cUang kamu tidak cukup. Butuh $" + cost + "."));
+                return;
+            }
+            VaultHook.getEconomy().withdrawPlayer(player, cost);
+        }
+
+        if (plugin.getWorldManager().applyIslandTheme(island, normalized)) {
+            player.sendMessage(plugin.getConfigManager().format("&aTheme island diubah ke &e" + plugin.getConfigManager().getConfig().getString(path + ".display-name", normalized) + "&a."));
+            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.2f);
+            openThemesGUI(player, island);
+        } else {
+            player.sendMessage(plugin.getConfigManager().format("&cTheme gagal diterapkan. Cek nama biome di config."));
+        }
+    }
+
+    private List<String> getThemeIds() {
+        ConfigurationSection section = plugin.getConfigManager().getConfig().getConfigurationSection("themes");
+        List<String> ids = new ArrayList<>();
+        if (section == null) {
+            return ids;
+        }
+        for (String key : section.getKeys(false)) {
+            if (section.getConfigurationSection(key) != null) {
+                ids.add(key);
+            }
+        }
+        return ids;
+    }
+
+    private void teleportParticipantsToLobby(Island island) {
+        Location lobby = plugin.getLobbyLocation();
+        for (UUID uuid : island.getParticipants()) {
+            Player participant = Bukkit.getPlayer(uuid);
+            if (participant != null) {
+                participant.setWorldBorder(null);
+                participant.teleport(lobby);
+            }
         }
     }
 

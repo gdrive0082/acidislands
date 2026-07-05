@@ -207,3 +207,120 @@ upgrades:
         LAPIS_ORE: 5.0
         DIAMOND_ORE: 2.0
         EMERALD_ORE: 1.0
+
+# Cleanup island saat delete/reset. Diproses bertahap agar tidak freeze server.
+cleanup:
+  enabled: true
+  padding: 8
+  min-y: -64
+  max-y: 160
+  columns-per-tick: 12
+
+# Island level dihitung dari value block di area border.
+level:
+  points-per-level: 100
+  cache-seconds: 300
+  scan-min-y: 63
+  scan-max-y: 160
+  default-block-value: 1
+  block-values:
+    COBBLESTONE: 1
+    STONE: 1
+    DIRT: 1
+    GRASS_BLOCK: 1
+    SAND: 1
+    SANDSTONE: 1
+    NETHERRACK: 1
+    COAL_ORE: 5
+    IRON_ORE: 10
+    GOLD_ORE: 20
+    LAPIS_ORE: 25
+    REDSTONE_ORE: 25
+    DIAMOND_ORE: 100
+    EMERALD_ORE: 125
+    IRON_BLOCK: 90
+    GOLD_BLOCK: 180
+    DIAMOND_BLOCK: 900
+    EMERALD_BLOCK: 1000
+    BEACON: 2500
+
+# Theme/biome island. Biome diterapkan ke area border secara bertahap.
+themes:
+  columns-per-tick: 32
+  classic:
+    display-name: "&aClassic Plains"
+    icon: "GRASS_BLOCK"
+    biome: "PLAINS"
+    cost: 0
+  desert:
+    display-name: "&eDry Desert"
+    icon: "SAND"
+    biome: "DESERT"
+    cost: 2500
+  nether:
+    display-name: "&cNether Wastes"
+    icon: "NETHERRACK"
+    biome: "NETHER_WASTES"
+    cost: 5000
+  ice:
+    display-name: "&bFrozen Ocean"
+    icon: "ICE"
+    biome: "FROZEN_OCEAN"
+    cost: 7500
+  cherry:
+    display-name: "&dCherry Grove"
+    icon: "CHERRY_SAPLING"
+    biome: "CHERRY_GROVE"
+    cost: 10000
+
+# Quest dasar island. Requirement bisa: created, border-level, generator-level,
+# bank-balance, members, theme, island-level.
+quests:
+  first_steps:
+    display-name: "&aFirst Steps"
+    icon: "OAK_SAPLING"
+    description:
+      - "&7Buat island pertamamu."
+    requirements:
+      created: true
+    reward-money: 250
+  bank_saver:
+    display-name: "&6Bank Saver"
+    icon: "GOLD_INGOT"
+    description:
+      - "&7Simpan uang di bank island."
+    requirements:
+      bank-balance: 1000
+    reward-money: 500
+  expand_border:
+    display-name: "&bExpand Border"
+    icon: "BEACON"
+    description:
+      - "&7Upgrade world border ke tier 2."
+    requirements:
+      border-level: 2
+    reward-money: 1000
+  better_generator:
+    display-name: "&eBetter Generator"
+    icon: "FURNACE"
+    description:
+      - "&7Upgrade cobble generator ke tier 2."
+    requirements:
+      generator-level: 2
+    reward-money: 1000
+  team_up:
+    display-name: "&dTeam Up"
+    icon: "PLAYER_HEAD"
+    description:
+      - "&7Ajak minimal 1 member ke island."
+    requirements:
+      members: 1
+    reward-money: 1500
+  island_value:
+    display-name: "&2Island Value"
+    icon: "DIAMOND"
+    description:
+      - "&7Capai island level 10."
+    requirements:
+      island-level: 10
+    reward-money: 2500

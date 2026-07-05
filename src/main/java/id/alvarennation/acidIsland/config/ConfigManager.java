@@ -65,7 +65,7 @@ public class ConfigManager {
         String rawMessage = messages.getString("messages." + path, "&cMessage path not found: " + path);
         for (int i = 0; i < placeholders.length; i += 2) {
             if (i + 1 < placeholders.length) {
-                rawMessage = rawMessage.replace(placeholders[i], placeholders[i + 1]);
+                rawMessage = rawMessage.replace(placeholders[i], placeholders[i + 1] == null ? "" : placeholders[i + 1]);
             }
         }
         return formatMessage(player, rawMessage);
