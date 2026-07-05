@@ -147,7 +147,7 @@ public class ConverseCraftHook implements Listener {
         }
     }
 
-    private int getMappedStoryStage(String conversationName) {
+    public int getMappedStoryStage(String conversationName) {
         if (conversationName == null || conversationName.isBlank()) {
             return 0;
         }

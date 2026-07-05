@@ -28,9 +28,11 @@ public class WorldManager {
 
     private final AcidIsland plugin;
     private World acidWorld;
+    private final IslandValueScanner islandValueScanner;
 
     public WorldManager(AcidIsland plugin) {
         this.plugin = plugin;
+        this.islandValueScanner = new IslandValueScanner(plugin);
     }
 
     public void initWorld() {
@@ -292,64 +294,11 @@ public class WorldManager {
     }
 
     public void scheduleIslandValueScan(Island island) {
-        if (island == null || island.isLevelScanInProgress()) {
-            return;
-        }
+        islandValueScanner.enqueue(island);
+    }
 
-        World world = getAcidWorld();
-        FileConfiguration config = plugin.getConfigManager().getConfig();
-        int borderSize = plugin.getIslandManager().getBorderSize(island);
-        int half = borderSize / 2;
-        int minX = island.getX() - half;
-        int maxX = island.getX() + half;
-        int minZ = island.getZ() - half;
-        int maxZ = island.getZ() + half;
-        int minY = Math.max(world.getMinHeight(), config.getInt("level.scan-min-y", 63));
-        int maxY = Math.min(world.getMaxHeight() - 1, config.getInt("level.scan-max-y", 160));
-        long defaultValue = config.getLong("level.default-block-value", 1L);
-        ConfigurationSection values = config.getConfigurationSection("level.block-values");
-        int blocksPerTick = Math.max(1, config.getInt("level.blocks-per-tick", 5000));
-        int pointsPerLevel = Math.max(1, config.getInt("level.points-per-level", 100));
-
-        if (maxY < minY) {
-            island.setLevelCache(0L, 0);
-            return;
-        }
-
-        island.setLevelScanInProgress(true);
-        new BukkitRunnable() {
-            private int x = minX;
-            private int z = minZ;
-            private int y = minY;
-            private long value = 0L;
-
-            @Override
-            public void run() {
-                int processed = 0;
-                while (processed < blocksPerTick) {
-                    Material material = world.getBlockAt(x, y, z).getType();
-                    value += getBlockValue(material, values, defaultValue);
-                    processed++;
-
-                    y++;
-                    if (y > maxY) {
-                        y = minY;
-                        z++;
-                    }
-                    if (z > maxZ) {
-                        z = minZ;
-                        x++;
-                    }
-                    if (x > maxX) {
-                        int level = (int) Math.max(0, value / pointsPerLevel);
-                        island.setLevelCache(value, level);
-                        island.setLevelScanInProgress(false);
-                        cancel();
-                        return;
-                    }
-                }
-            }
-        }.runTaskTimer(plugin, 1L, 1L);
+    public void cancelIslandValueScans() {
+        islandValueScanner.cancelAll();
     }
 
     public boolean applyIslandTheme(Island island, String themeId) {
@@ -428,13 +377,6 @@ public class WorldManager {
                 entity.remove();
             }
         }
-    }
-
-    private long getBlockValue(Material material, ConfigurationSection values, long defaultValue) {
-        if (material.isAir() || material == Material.WATER || material == Material.BEDROCK) {
-            return 0L;
-        }
-        return values == null ? defaultValue : values.getLong(material.name(), defaultValue);
     }
 
     private Biome getThemeBiome(String themeId) {

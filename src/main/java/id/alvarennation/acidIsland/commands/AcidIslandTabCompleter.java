@@ -1,7 +1,9 @@
 package id.alvarennation.acidIsland.commands;
 
 import id.alvarennation.acidIsland.AcidIsland;
+import id.alvarennation.acidIsland.island.Island;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
@@ -34,13 +36,14 @@ public class AcidIslandTabCompleter implements TabCompleter {
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return filter(SUBCOMMANDS, args[0]);
+            return filter(getVisibleSubcommands(sender), args[0]);
         }
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2) {
             return switch (sub) {
-                case "invite", "kick", "role" -> onlinePlayerNames(sender, args[1]);
+                case "invite" -> onlinePlayerNames(sender, args[1]);
+                case "kick", "role" -> islandMemberNames(sender, args[1]);
                 case "bank" -> filter(List.of("deposit", "withdraw"), args[1]);
                 case "accept" -> filter(List.of("confirm"), args[1]);
                 case "quest", "quests" -> filter(List.of("claim"), args[1]);
@@ -90,6 +93,37 @@ public class AcidIslandTabCompleter implements TabCompleter {
                 .map(Player::getName)
                 .filter(name -> !(sender instanceof Player player) || !name.equals(player.getName()))
                 .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(input.toLowerCase(Locale.ROOT)))
+                .collect(Collectors.toList());
+    }
+
+    private List<String> islandMemberNames(CommandSender sender, String input) {
+        if (!(sender instanceof Player player)) {
+            return new ArrayList<>();
+        }
+        Island island = plugin.getIslandManager().getIslandByPlayer(player.getUniqueId());
+        if (island == null) {
+            return new ArrayList<>();
+        }
+
+        return island.getMembers().stream()
+                .map(uuid -> {
+                    Player online = Bukkit.getPlayer(uuid);
+                    if (online != null) {
+                        return online.getName();
+                    }
+                    OfflinePlayer offline = Bukkit.getOfflinePlayer(uuid);
+                    return offline.getName() == null ? uuid.toString() : offline.getName();
+                })
+                .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(input.toLowerCase(Locale.ROOT)))
+                .collect(Collectors.toList());
+    }
+
+    private List<String> getVisibleSubcommands(CommandSender sender) {
+        if (!(sender instanceof Player player) || player.hasPermission("acidisland.admin")) {
+            return SUBCOMMANDS;
+        }
+        return SUBCOMMANDS.stream()
+                .filter(sub -> !sub.equals("setlobby") && !sub.equals("reload") && !sub.equals("admin"))
                 .collect(Collectors.toList());
     }
 

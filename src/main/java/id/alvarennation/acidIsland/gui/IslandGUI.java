@@ -11,6 +11,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -346,6 +347,10 @@ public class IslandGUI implements Listener {
             String base64 = island.getVaultBase64();
             if (base64 != null && !base64.isEmpty()) {
                 ItemStack[] items = Island.itemStackArrayFromBase64(base64);
+                if (items == null) {
+                    player.sendMessage(plugin.getConfigManager().format("&cVault gagal dibaca. Data lama tidak akan ditimpa; hubungi admin."));
+                    return;
+                }
                 for (int i = 0; i < Math.min(items.length, inv.getSize()); i++) {
                     inv.setItem(i, items[i]);
                 }
@@ -354,6 +359,60 @@ public class IslandGUI implements Listener {
         }
 
         player.openInventory(inv);
+    }
+
+    public boolean flushVault(UUID ownerUuid) {
+        Inventory inventory = openVaults.get(ownerUuid);
+        if (inventory == null) {
+            return true;
+        }
+        return flushVaultInventory(ownerUuid, inventory);
+    }
+
+    public void flushAllVaults() {
+        for (UUID ownerUuid : new ArrayList<>(openVaults.keySet())) {
+            flushVault(ownerUuid);
+        }
+    }
+
+    public void closeAndFlushVault(UUID ownerUuid) {
+        Inventory inventory = openVaults.get(ownerUuid);
+        if (inventory == null) {
+            return;
+        }
+        flushVaultInventory(ownerUuid, inventory);
+        for (HumanEntity viewer : new ArrayList<>(inventory.getViewers())) {
+            viewer.closeInventory();
+        }
+        openVaults.remove(ownerUuid, inventory);
+    }
+
+    public void closeAndDiscardVault(UUID ownerUuid) {
+        Inventory inventory = openVaults.remove(ownerUuid);
+        if (inventory == null) {
+            return;
+        }
+        for (HumanEntity viewer : new ArrayList<>(inventory.getViewers())) {
+            viewer.closeInventory();
+        }
+    }
+
+    public void closeAllAcidIslandInventories(String message) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getOpenInventory().getTopInventory().getHolder() instanceof AcidIslandHolder holder) {
+                if (holder.getGuiType().equals("vault")) {
+                    Island island = holder.getIsland();
+                    if (island != null) {
+                        flushVaultInventory(island.getOwner(), player.getOpenInventory().getTopInventory());
+                    }
+                }
+                player.closeInventory();
+                if (message != null && !message.isBlank()) {
+                    player.sendMessage(plugin.getConfigManager().format(message));
+                }
+            }
+        }
+        openVaults.clear();
     }
 
     // ==========================================
@@ -410,6 +469,11 @@ public class IslandGUI implements Listener {
         else if (slot == 15) type = "nether";
 
         if (!type.isEmpty()) {
+            if (plugin.getIslandManager().getIslandByPlayer(player.getUniqueId()) != null) {
+                player.closeInventory();
+                player.sendMessage(plugin.getConfigManager().getMessage(player, "already-has-island"));
+                return;
+            }
             if (!plugin.getIslandManager().canCreateIsland(player.getUniqueId())) {
                 player.closeInventory();
                 player.sendMessage(plugin.getConfigManager().format("&cKamu baru bisa membuat island lagi dalam " + formatDuration(plugin.getIslandManager().getCreateCooldownRemainingMillis(player.getUniqueId())) + "."));
@@ -558,6 +622,9 @@ public class IslandGUI implements Listener {
                 player.sendMessage(plugin.getConfigManager().format("&cPembayaran upgrade gagal: " + response.errorMessage));
                 return;
             }
+            if (type.equals("vault")) {
+                plugin.getIslandGUI().closeAndFlushVault(island.getOwner());
+            }
             island.setLevel(type, nextLvl);
             plugin.getIslandManager().saveData();
 
@@ -572,10 +639,15 @@ public class IslandGUI implements Listener {
                 }
             } else if (type.equals("minions")) {
                 // Integrasi AxMinions limit command jika terpasang
-                int minionLimit = config.getInt("upgrades.minions." + nextLvl + ".limit");
-                OfflinePlayer owner = Bukkit.getOfflinePlayer(island.getOwner());
-                String targetName = owner.getName() == null ? player.getName() : owner.getName();
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "axminions limit set " + targetName + " " + minionLimit);
+                if (Bukkit.getPluginManager().getPlugin("AxMinions") != null) {
+                    int minionLimit = config.getInt("upgrades.minions." + nextLvl + ".limit");
+                    OfflinePlayer owner = Bukkit.getOfflinePlayer(island.getOwner());
+                    if (owner.getName() == null) {
+                        plugin.getLogger().warning("Skipped AxMinions limit update: unknown owner name for " + island.getOwner() + ".");
+                    } else {
+                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "axminions limit set " + owner.getName() + " " + minionLimit);
+                    }
+                }
             }
 
             player.sendMessage(plugin.getConfigManager().getMessage(player, "upgrade-success", "{upgrade}", type.toUpperCase(), "{level}", String.valueOf(nextLvl)));
@@ -726,9 +798,7 @@ public class IslandGUI implements Listener {
                 Island island = holder.getIsland();
                 if (island != null) {
                     Inventory inventory = event.getInventory();
-                    String base64 = Island.itemStackArrayToBase64(inventory.getContents());
-                    island.setVaultBase64(base64);
-                    plugin.getIslandManager().saveData();
+                    flushVaultInventory(island.getOwner(), inventory);
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         if (inventory.getViewers().isEmpty()) {
                             openVaults.remove(island.getOwner(), inventory);
@@ -737,5 +807,22 @@ public class IslandGUI implements Listener {
                 }
             }
         }
+    }
+
+    private boolean flushVaultInventory(UUID ownerUuid, Inventory inventory) {
+        Island currentIsland = plugin.getIslandManager().getIslandByOwner(ownerUuid);
+        if (currentIsland == null) {
+            return false;
+        }
+
+        String base64 = Island.itemStackArrayToBase64(inventory.getContents());
+        if (base64 == null) {
+            plugin.getLogger().warning("Skipping vault save for " + ownerUuid + " because serialization failed.");
+            return false;
+        }
+
+        currentIsland.setVaultBase64(base64);
+        plugin.getIslandManager().saveData();
+        return true;
     }
 }

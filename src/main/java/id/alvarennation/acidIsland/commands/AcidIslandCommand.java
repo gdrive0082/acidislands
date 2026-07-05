@@ -137,9 +137,14 @@ public class AcidIslandCommand implements CommandExecutor {
             sender.sendMessage("§cKamu tidak punya izin untuk melakukan ini!");
             return;
         }
+        plugin.getIslandGUI().flushAllVaults();
         plugin.getIslandManager().saveData();
         plugin.getConfigManager().reload();
         plugin.getIslandManager().loadData();
+        if (plugin.getGeneratorListener() != null) {
+            plugin.getGeneratorListener().rebuildOreTables();
+        }
+        plugin.getIslandGUI().closeAllAcidIslandInventories("&eGUI AcidIsland ditutup karena reload.");
         sender.sendMessage("§aAcidIsland config dan data berhasil direload.");
     }
 
@@ -181,11 +186,12 @@ public class AcidIslandCommand implements CommandExecutor {
                 sender.sendMessage("§aIsland milik " + args[2] + " dihapus dan cleanup dijadwalkan.");
             }
             case "reset" -> {
-                Island oldIsland = plugin.getIslandManager().deleteIsland(targetUuid, true);
+                plugin.getIslandManager().removePlayerFromCurrentIsland(targetUuid);
+                Island oldIsland = plugin.getIslandManager().deleteIsland(targetUuid, true, false);
                 if (oldIsland != null) {
                     teleportParticipantsToLobby(oldIsland);
                 }
-                Island newIsland = plugin.getIslandManager().createIsland(targetUuid, "classic");
+                Island newIsland = plugin.getIslandManager().createIsland(targetUuid, "classic", false);
                 Player onlineTarget = target.getPlayer();
                 if (onlineTarget != null) {
                     onlineTarget.teleport(newIsland.getHome(plugin.getWorldManager().getAcidWorld()));
@@ -642,6 +648,14 @@ public class AcidIslandCommand implements CommandExecutor {
                 player.sendMessage(plugin.getConfigManager().format("&cConverseCraft belum aktif di server ini."));
                 return;
             }
+            int mappedStage = plugin.getConverseCraftHook().getMappedStoryStage(args[2]);
+            if (mappedStage > 0 && plugin.getConfigManager().getConfig().getBoolean("integrations.conversecraft.enforce-sequential", true)) {
+                int currentStage = plugin.getIslandManager().getStoryStage(player.getUniqueId());
+                if (mappedStage > currentStage + 1) {
+                    player.sendMessage(plugin.getConfigManager().format("&cSelesaikan chapter sebelumnya dulu. Stage kamu: &e" + currentStage + "&c, chapter ini butuh stage &e" + (mappedStage - 1) + "&c."));
+                    return;
+                }
+            }
             boolean started = plugin.getConverseCraftHook().startConversation(player, args[2]);
             if (!started) {
                 player.sendMessage(plugin.getConfigManager().format("&cConversation &e" + args[2] + " &cgagal dimulai atau tidak ditemukan."));
@@ -659,7 +673,8 @@ public class AcidIslandCommand implements CommandExecutor {
         for (IslandManager.IslandRanking entry : top) {
             OfflinePlayer owner = Bukkit.getOfflinePlayer(entry.island().getOwner());
             String name = owner.getName() == null ? entry.island().getOwner().toString() : owner.getName();
-            sender.sendMessage("§e#" + rank + " §f" + name + " §7- Level §a" + entry.level() + " §7(Value §a" + entry.value() + "§7)");
+            String suffix = entry.island().isLevelScanInProgress() ? " &7(cache, scanning)" : " &7(cache)";
+            sender.sendMessage(plugin.getConfigManager().format("&e#" + rank + " &f" + name + " &7- Level &a" + entry.level() + " &7(Value &a" + entry.value() + "&7)" + suffix));
             rank++;
         }
         if (top.isEmpty()) {

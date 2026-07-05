@@ -39,6 +39,9 @@ public class IslandManager {
     }
 
     public void loadData() {
+        if (plugin.getWorldManager() != null) {
+            plugin.getWorldManager().cancelIslandValueScans();
+        }
         islandsByOwner.clear();
         memberToOwnerMap.clear();
         pendingInvites.clear();
@@ -213,6 +216,13 @@ public class IslandManager {
     }
 
     public Island createIsland(UUID ownerUuid, String type) {
+        return createIsland(ownerUuid, type, true);
+    }
+
+    public Island createIsland(UUID ownerUuid, String type, boolean recordCooldown) {
+        if (islandsByOwner.containsKey(ownerUuid)) {
+            throw new IllegalStateException("Player already owns an island: " + ownerUuid);
+        }
         int spacing = plugin.getConfigManager().getConfig().getInt("island-spacing", 400);
         int[] grid = gridForIndex(nextGridIndex);
         int cx = grid[0] * spacing;
@@ -225,7 +235,9 @@ public class IslandManager {
         island.setTheme(type);
         islandsByOwner.put(ownerUuid, island);
         indexIsland(island);
-        lastIslandCreateMillis.put(ownerUuid, System.currentTimeMillis());
+        if (recordCooldown) {
+            lastIslandCreateMillis.put(ownerUuid, System.currentTimeMillis());
+        }
         plugin.getWorldManager().applyIslandTheme(island, type);
         saveData();
 
@@ -237,6 +249,13 @@ public class IslandManager {
     }
 
     public Island deleteIsland(UUID ownerUuid, boolean cleanupWorld) {
+        return deleteIsland(ownerUuid, cleanupWorld, true);
+    }
+
+    public Island deleteIsland(UUID ownerUuid, boolean cleanupWorld, boolean recordCooldown) {
+        if (plugin.getIslandGUI() != null) {
+            plugin.getIslandGUI().closeAndDiscardVault(ownerUuid);
+        }
         Island island = islandsByOwner.remove(ownerUuid);
         if (island == null) {
             return null;
@@ -254,7 +273,9 @@ public class IslandManager {
         if (cleanupWorld) {
             plugin.getWorldManager().scheduleIslandCleanup(island);
         }
-        lastIslandDeleteMillis.put(ownerUuid, System.currentTimeMillis());
+        if (recordCooldown) {
+            lastIslandDeleteMillis.put(ownerUuid, System.currentTimeMillis());
+        }
         saveData();
         return island;
     }
@@ -373,24 +394,40 @@ public class IslandManager {
     }
 
     public long getIslandValue(Island island, boolean forceRefresh) {
+        return getIslandValue(island, forceRefresh, true);
+    }
+
+    public long getIslandValue(Island island, boolean forceRefresh, boolean allowSchedule) {
         int cacheSeconds = plugin.getConfigManager().getConfig().getInt("level.cache-seconds", 300);
         long cacheAge = System.currentTimeMillis() - island.getLastLevelScanMillis();
         if (!forceRefresh && island.getCachedIslandValue() >= 0 && cacheAge < cacheSeconds * 1000L) {
             return island.getCachedIslandValue();
         }
-        plugin.getWorldManager().scheduleIslandValueScan(island);
+        if (allowSchedule) {
+            plugin.getWorldManager().scheduleIslandValueScan(island);
+        }
         return Math.max(0L, island.getCachedIslandValue());
     }
 
     public int getIslandLevel(Island island, boolean forceRefresh) {
-        getIslandValue(island, forceRefresh);
+        getIslandValue(island, forceRefresh, true);
+        return island.getCachedIslandLevel();
+    }
+
+    public int getIslandLevel(Island island, boolean forceRefresh, boolean allowSchedule) {
+        getIslandValue(island, forceRefresh, allowSchedule);
         return island.getCachedIslandLevel();
     }
 
     public List<IslandRanking> getTopIslands(int limit) {
         List<IslandRanking> rankings = new ArrayList<>();
+        int scheduled = 0;
         for (Island island : islandsByOwner.values()) {
-            long value = getIslandValue(island, false);
+            boolean allowSchedule = scheduled < limit;
+            long value = getIslandValue(island, false, allowSchedule);
+            if (allowSchedule && island.isLevelScanInProgress()) {
+                scheduled++;
+            }
             rankings.add(new IslandRanking(island, value, island.getCachedIslandLevel()));
         }
         rankings.sort(Comparator.comparingLong(IslandRanking::value).reversed());

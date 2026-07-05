@@ -30,6 +30,7 @@ public final class AcidIsland extends JavaPlugin {
     private IslandGUI islandGUI;
     private QuestManager questManager;
     private ConverseCraftHook converseCraftHook;
+    private GeneratorListener generatorListener;
 
     @Override
     public void onEnable() {
@@ -62,7 +63,8 @@ public final class AcidIsland extends JavaPlugin {
         // 4. Register Listeners
         Bukkit.getPluginManager().registerEvents(new AcidListener(this), this);
         Bukkit.getPluginManager().registerEvents(new IslandProtectionListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new GeneratorListener(this), this);
+        this.generatorListener = new GeneratorListener(this);
+        Bukkit.getPluginManager().registerEvents(generatorListener, this);
         Bukkit.getPluginManager().registerEvents(islandGUI, this);
 
         // 6. Register Commands
@@ -84,11 +86,18 @@ public final class AcidIsland extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (islandGUI != null) {
+            islandGUI.flushAllVaults();
+        }
+        if (worldManager != null) {
+            worldManager.cancelIslandValueScans();
+        }
         // Save all data on plugin shutdown
         if (islandManager != null) {
             islandManager.saveData();
             getLogger().info("AcidIsland data saved successfully.");
         }
+        Bukkit.getScheduler().cancelTasks(this);
         getLogger().info("AcidIsland Plugin has been disabled!");
     }
 
@@ -110,6 +119,10 @@ public final class AcidIsland extends JavaPlugin {
 
     public QuestManager getQuestManager() {
         return questManager;
+    }
+
+    public GeneratorListener getGeneratorListener() {
+        return generatorListener;
     }
 
     public ConverseCraftHook getConverseCraftHook() {

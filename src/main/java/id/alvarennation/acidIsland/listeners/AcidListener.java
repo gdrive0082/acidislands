@@ -8,7 +8,9 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -105,5 +107,12 @@ public class AcidListener implements Listener {
                 }
             }
         }.runTaskTimer(plugin, 20L, 20L); // Run every 1 second (20 ticks)
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        lastWaterDamage.remove(uuid);
+        lastRainDamage.remove(uuid);
     }
 }

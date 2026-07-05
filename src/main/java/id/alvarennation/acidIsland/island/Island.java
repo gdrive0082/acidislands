@@ -2,6 +2,7 @@ package id.alvarennation.acidIsland.island;
 
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.Bukkit;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.io.BukkitObjectInputStream;
 import org.bukkit.util.io.BukkitObjectOutputStream;
@@ -291,7 +292,8 @@ public class Island {
             dataOutput.close();
             return Base64.getEncoder().encodeToString(outputStream.toByteArray());
         } catch (Exception e) {
-            return "";
+            Bukkit.getLogger().warning("Failed to serialize AcidIsland vault inventory: " + e.getMessage());
+            return null;
         }
     }
 
@@ -307,7 +309,8 @@ public class Island {
             dataInput.close();
             return items;
         } catch (Exception e) {
-            return new ItemStack[0];
+            Bukkit.getLogger().warning("Failed to deserialize AcidIsland vault inventory: " + e.getMessage());
+            return null;
         }
     }
 }

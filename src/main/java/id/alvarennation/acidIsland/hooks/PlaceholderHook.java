@@ -83,10 +83,10 @@ public class PlaceholderHook {
                     return island != null ? String.valueOf(plugin.getIslandManager().getIslandStoryStage(island)) : "0";
                 }
                 case "island_level" -> {
-                    return island != null ? String.valueOf(plugin.getIslandManager().getIslandLevel(island, false)) : "0";
+                    return island != null ? String.valueOf(plugin.getIslandManager().getIslandLevel(island, false, false)) : "0";
                 }
                 case "island_value" -> {
-                    return island != null ? String.valueOf(plugin.getIslandManager().getIslandValue(island, false)) : "0";
+                    return island != null ? String.valueOf(plugin.getIslandManager().getIslandValue(island, false, false)) : "0";
                 }
                 case "theme" -> {
                     return island != null ? island.getTheme() : "-";

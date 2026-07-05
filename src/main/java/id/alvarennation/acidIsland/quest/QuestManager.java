@@ -89,6 +89,9 @@ public class QuestManager {
             return ClaimResult.REQUIREMENTS_NOT_MET;
         }
 
+        island.completeQuest(questId);
+        plugin.getIslandManager().saveData();
+
         double rewardMoney = getRewardMoney(questId);
         if (rewardMoney > 0) {
             if (!VaultHook.hasEconomy()) {
@@ -105,11 +108,13 @@ public class QuestManager {
             String parsed = command
                     .replace("{player}", player.getName())
                     .replace("{owner}", owner.getName() == null ? player.getName() : owner.getName());
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), parsed);
+            try {
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), parsed);
+            } catch (RuntimeException ex) {
+                plugin.getLogger().warning("Reward command failed for quest '" + questId + "': " + parsed + " (" + ex.getMessage() + ")");
+            }
         }
 
-        island.completeQuest(questId);
-        plugin.getIslandManager().saveData();
         return ClaimResult.CLAIMED;
     }
 

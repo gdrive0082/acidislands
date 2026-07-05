@@ -58,6 +58,7 @@ integrations:
     # acidisland.story.stage.1, acidisland.story.stage.2, dst.
     sync-flags-to-conversecraft: true
     only-increase-stage: true
+    enforce-sequential: true
     notify-stage-up: true
     flag-prefix: "acidisland.story.stage."
     max-stage-flags: 10
@@ -256,6 +257,7 @@ level:
   scan-min-y: 63
   scan-max-y: 320
   blocks-per-tick: 5000
+  chunks-per-batch: 4
   default-block-value: 1
   block-values:
     COBBLESTONE: 1
