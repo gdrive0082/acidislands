@@ -26,6 +26,8 @@ public class IslandManager {
     private final Map<UUID, UUID> memberToOwnerMap = new HashMap<>();
     private final Map<UUID, UUID> pendingInvites = new HashMap<>();
     private final Map<String, Island> islandsByGrid = new HashMap<>();
+    private final Map<UUID, Long> lastIslandCreateMillis = new HashMap<>();
+    private final Map<UUID, Long> lastIslandDeleteMillis = new HashMap<>();
 
     private int nextGridIndex = 0;
 
@@ -40,6 +42,8 @@ public class IslandManager {
         memberToOwnerMap.clear();
         pendingInvites.clear();
         islandsByGrid.clear();
+        lastIslandCreateMillis.clear();
+        lastIslandDeleteMillis.clear();
 
         if (!dataFile.exists()) {
             try {
@@ -49,7 +53,11 @@ public class IslandManager {
             }
         }
         dataConfig = YamlConfiguration.loadConfiguration(dataFile);
-        nextGridIndex = dataConfig.getInt("next-grid-index", 0);
+        nextGridIndex = dataConfig.getInt(
+                "next-grid-index",
+                plugin.getConfigManager().getConfig().getInt("island-start-grid-index", 1)
+        );
+        loadCooldowns();
 
         ConfigurationSection section = dataConfig.getConfigurationSection("islands");
         if (section == null) {
@@ -57,7 +65,13 @@ public class IslandManager {
         }
 
         for (String key : section.getKeys(false)) {
-            UUID ownerUuid = UUID.fromString(key);
+            UUID ownerUuid;
+            try {
+                ownerUuid = UUID.fromString(key);
+            } catch (IllegalArgumentException ex) {
+                plugin.getLogger().warning("Skipping invalid island owner UUID in islands.yml: " + key);
+                continue;
+            }
             int x = section.getInt(key + ".x");
             int z = section.getInt(key + ".z");
 
@@ -77,7 +91,13 @@ public class IslandManager {
             List<String> membersList = section.getStringList(key + ".members");
             ConfigurationSection roleSection = section.getConfigurationSection(key + ".member-roles");
             for (String memberStr : membersList) {
-                UUID memberUuid = UUID.fromString(memberStr);
+                UUID memberUuid;
+                try {
+                    memberUuid = UUID.fromString(memberStr);
+                } catch (IllegalArgumentException ex) {
+                    plugin.getLogger().warning("Skipping invalid member UUID '" + memberStr + "' in island " + key + ".");
+                    continue;
+                }
                 String rawRole = roleSection == null ? "MEMBER" : roleSection.getString(memberStr, "MEMBER");
                 island.addMember(memberUuid, IslandRole.fromString(rawRole));
                 memberToOwnerMap.put(memberUuid, ownerUuid);
@@ -117,6 +137,7 @@ public class IslandManager {
 
     public void saveData() {
         dataConfig.set("next-grid-index", nextGridIndex);
+        saveCooldowns();
 
         for (Map.Entry<UUID, Island> entry : islandsByOwner.entrySet()) {
             UUID ownerUuid = entry.getKey();
@@ -200,6 +221,7 @@ public class IslandManager {
         island.setTheme(type);
         islandsByOwner.put(ownerUuid, island);
         indexIsland(island);
+        lastIslandCreateMillis.put(ownerUuid, System.currentTimeMillis());
         plugin.getWorldManager().applyIslandTheme(island, type);
         saveData();
 
@@ -224,11 +246,12 @@ public class IslandManager {
                 || entry.getValue().equals(ownerUuid)
                 || island.getMembers().contains(entry.getKey()));
         dataConfig.set("islands." + ownerUuid, null);
-        saveData();
 
         if (cleanupWorld) {
             plugin.getWorldManager().scheduleIslandCleanup(island);
         }
+        lastIslandDeleteMillis.put(ownerUuid, System.currentTimeMillis());
+        saveData();
         return island;
     }
 
@@ -267,6 +290,31 @@ public class IslandManager {
 
     public void removeInvite(UUID invited) {
         pendingInvites.remove(invited);
+    }
+
+    public boolean canCreateIsland(UUID playerUuid) {
+        return getCreateCooldownRemainingMillis(playerUuid) <= 0L;
+    }
+
+    public long getCreateCooldownRemainingMillis(UUID playerUuid) {
+        long now = System.currentTimeMillis();
+        long createCooldown = plugin.getConfigManager().getConfig().getLong("cooldowns.create-seconds", 1800L) * 1000L;
+        long deleteCooldown = plugin.getConfigManager().getConfig().getLong("cooldowns.delete-seconds", 1800L) * 1000L;
+        long lastCreate = lastIslandCreateMillis.getOrDefault(playerUuid, 0L);
+        long lastDelete = lastIslandDeleteMillis.getOrDefault(playerUuid, 0L);
+        long createRemaining = createCooldown - (now - lastCreate);
+        long deleteRemaining = deleteCooldown - (now - lastDelete);
+        return Math.max(0L, Math.max(createRemaining, deleteRemaining));
+    }
+
+    public boolean canDeleteIsland(UUID playerUuid) {
+        return getDeleteCooldownRemainingMillis(playerUuid) <= 0L;
+    }
+
+    public long getDeleteCooldownRemainingMillis(UUID playerUuid) {
+        long cooldown = plugin.getConfigManager().getConfig().getLong("cooldowns.delete-seconds", 1800L) * 1000L;
+        long lastDelete = lastIslandDeleteMillis.getOrDefault(playerUuid, 0L);
+        return Math.max(0L, cooldown - (System.currentTimeMillis() - lastDelete));
     }
 
     public Island getIslandAt(Location loc) {
@@ -384,6 +432,33 @@ public class IslandManager {
 
     private String gridKey(int gridX, int gridZ) {
         return gridX + ":" + gridZ;
+    }
+
+    private void loadCooldowns() {
+        ConfigurationSection section = dataConfig.getConfigurationSection("cooldowns");
+        if (section == null) {
+            return;
+        }
+
+        for (String key : section.getKeys(false)) {
+            try {
+                UUID uuid = UUID.fromString(key);
+                lastIslandCreateMillis.put(uuid, section.getLong(key + ".last-create", 0L));
+                lastIslandDeleteMillis.put(uuid, section.getLong(key + ".last-delete", 0L));
+            } catch (IllegalArgumentException ex) {
+                plugin.getLogger().warning("Skipping invalid cooldown UUID in islands.yml: " + key);
+            }
+        }
+    }
+
+    private void saveCooldowns() {
+        dataConfig.set("cooldowns", null);
+        for (Map.Entry<UUID, Long> entry : lastIslandCreateMillis.entrySet()) {
+            dataConfig.set("cooldowns." + entry.getKey() + ".last-create", entry.getValue());
+        }
+        for (Map.Entry<UUID, Long> entry : lastIslandDeleteMillis.entrySet()) {
+            dataConfig.set("cooldowns." + entry.getKey() + ".last-delete", entry.getValue());
+        }
     }
 
     public record IslandRanking(Island island, long value, int level) {

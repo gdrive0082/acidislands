@@ -49,9 +49,9 @@ public class Island {
         this.x = x;
         this.z = z;
 
-        this.homeX = x;
+        this.homeX = x + 0.5;
         this.homeY = 76;
-        this.homeZ = z;
+        this.homeZ = z - 2.5;
         this.homeYaw = 0;
         this.homePitch = 0;
 
@@ -143,7 +143,7 @@ public class Island {
     }
 
     public boolean canUseBank(UUID uuid) {
-        return hasRole(uuid, IslandRole.CO_OWNER);
+        return hasRole(uuid, IslandRole.TRUSTED);
     }
 
     public boolean canChangeRoles(UUID uuid) {

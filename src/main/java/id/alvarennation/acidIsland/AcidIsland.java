@@ -11,11 +11,15 @@ import id.alvarennation.acidIsland.listeners.AcidListener;
 import id.alvarennation.acidIsland.listeners.GeneratorListener;
 import id.alvarennation.acidIsland.listeners.IslandProtectionListener;
 import id.alvarennation.acidIsland.quest.QuestManager;
+import id.alvarennation.acidIsland.world.VoidWorldGenerator;
 import id.alvarennation.acidIsland.world.WorldManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import org.jetbrains.annotations.Nullable;
 
 public final class AcidIsland extends JavaPlugin {
 
@@ -61,9 +65,17 @@ public final class AcidIsland extends JavaPlugin {
         if (getCommand("ai") != null) {
             getCommand("ai").setExecutor(new AcidIslandCommand(this));
             getCommand("ai").setTabCompleter( new AcidIslandTabCompleter(this));
+        } else {
+            getLogger().severe("Command /ai is not registered. Check plugin.yml commands section.");
         }
 
         getLogger().info("AcidIsland Plugin has been enabled!");
+    }
+
+    @Override
+    public @Nullable ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
+        int waterHeight = getConfig().getInt("acid-water.height", 62);
+        return new VoidWorldGenerator(waterHeight);
     }
 
     @Override

@@ -42,6 +42,7 @@ public class AcidIslandTabCompleter implements TabCompleter {
             return switch (sub) {
                 case "invite", "kick", "role" -> onlinePlayerNames(sender, args[1]);
                 case "bank" -> filter(List.of("deposit", "withdraw"), args[1]);
+                case "accept" -> filter(List.of("confirm"), args[1]);
                 case "quest", "quests" -> filter(List.of("claim"), args[1]);
                 case "level" -> filter(List.of("refresh"), args[1]);
                 case "theme", "themes", "biome" -> filter(getThemeIds(), args[1]);

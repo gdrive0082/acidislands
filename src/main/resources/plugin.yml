@@ -2,38 +2,17 @@ name: AcidIsland
 version: '1.0-SNAPSHOT'
 main: id.alvarennation.acidIsland.AcidIsland
 api-version: '1.21'
-dependencies:
-  server:
-    Vault:
-      load: BEFORE
-      required: false
-    floodgate:
-      load: BEFORE
-      required: false
-    Multiverse-Core:
-      load: BEFORE
-      required: false
-    AxMinions:
-      load: BEFORE
-      required: false
-    AlvarenEconomy:
-      load: BEFORE
-      required: false
-    AlvarenCore:
-      load: BEFORE
-      required: false
-    Skulls:
-      load: BEFORE
-      required: false
-    MMOItems:
-      load: BEFORE
-      required: false
-    ModelEngine:
-      load: BEFORE
-      required: false
-    PlaceholderAPI:
-      load: BEFORE
-      required: false
+softdepend:
+  - Vault
+  - floodgate
+  - Multiverse-Core
+  - AxMinions
+  - AlvarenEconomy
+  - AlvarenCore
+  - Skulls
+  - MMOItems
+  - ModelEngine
+  - PlaceholderAPI
 commands:
   ai:
     description: Main AcidIsland command

@@ -1,7 +1,6 @@
 package id.alvarennation.acidIsland.commands;
 
 import id.alvarennation.acidIsland.AcidIsland;
-import id.alvarennation.acidIsland.gui.IslandGUI;
 import id.alvarennation.acidIsland.hooks.VaultHook;
 import id.alvarennation.acidIsland.island.Island;
 import id.alvarennation.acidIsland.island.IslandManager;
@@ -15,8 +14,6 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import net.milkbowl.vault.economy.EconomyResponse;
 
@@ -78,6 +75,8 @@ public class AcidIslandCommand implements CommandExecutor {
             case "start" -> {
                 if (plugin.getIslandManager().hasIsland(player.getUniqueId())) {
                     teleportHome(player);
+                } else if (!plugin.getIslandManager().canCreateIsland(player.getUniqueId())) {
+                    player.sendMessage(plugin.getConfigManager().format("&cKamu baru bisa membuat island lagi dalam " + formatDuration(plugin.getIslandManager().getCreateCooldownRemainingMillis(player.getUniqueId())) + "."));
                 } else {
                     plugin.getIslandGUI().openStarterGUI(player);
                 }
@@ -99,7 +98,7 @@ public class AcidIslandCommand implements CommandExecutor {
             case "vault" -> {
                 Island island = requireIsland(player);
                 if (island != null) {
-                    openVault(player, island);
+                    plugin.getIslandGUI().openVault(player, island);
                 }
             }
             case "bank" -> handleBankCommand(player, args);
@@ -110,7 +109,7 @@ public class AcidIslandCommand implements CommandExecutor {
                 }
                 handleInvite(player, args[1]);
             }
-            case "accept" -> handleAccept(player);
+            case "accept" -> handleAccept(player, args);
             case "reject" -> handleReject(player);
             case "kick" -> {
                 if (args.length < 2) {
@@ -237,24 +236,6 @@ public class AcidIslandCommand implements CommandExecutor {
         player.sendMessage(plugin.getConfigManager().getMessage(player, "home-set"));
     }
 
-    private void openVault(Player player, Island island) {
-        FileConfiguration config = plugin.getConfigManager().getConfig();
-        int level = island.getLevel("vault");
-        int rows = config.getInt("upgrades.vault." + level + ".rows", 1);
-
-        Inventory inv = Bukkit.createInventory(new IslandGUI.AcidIslandHolder("vault", island), rows * 9, plugin.getConfigManager().format("&6&lIsland Vault"));
-
-        String base64 = island.getVaultBase64();
-        if (base64 != null && !base64.isEmpty()) {
-            ItemStack[] items = Island.itemStackArrayFromBase64(base64);
-            for (int i = 0; i < Math.min(items.length, inv.getSize()); i++) {
-                inv.setItem(i, items[i]);
-            }
-        }
-
-        player.openInventory(inv);
-    }
-
     private void handleBankCommand(Player player, String[] args) {
         Island island = requireIsland(player);
         if (island == null) {
@@ -283,7 +264,8 @@ public class AcidIslandCommand implements CommandExecutor {
         double amount;
         try {
             amount = Double.parseDouble(args[2]);
-            if (amount <= 0) throw new NumberFormatException();
+            if (!Double.isFinite(amount) || amount <= 0) throw new NumberFormatException();
+            amount = Math.round(amount * 100.0) / 100.0;
         } catch (NumberFormatException e) {
             player.sendMessage(plugin.getConfigManager().format("&cMasukkan jumlah uang yang valid!"));
             return;
@@ -374,7 +356,7 @@ public class AcidIslandCommand implements CommandExecutor {
         target.sendMessage(plugin.getConfigManager().getMessage(target, "invite-received", "{player}", player.getName()));
     }
 
-    private void handleAccept(Player player) {
+    private void handleAccept(Player player, String[] args) {
         UUID ownerUuid = plugin.getIslandManager().getPendingInvite(player.getUniqueId());
         if (ownerUuid == null) {
             player.sendMessage(plugin.getConfigManager().getMessage(player, "invite-no-pending"));
@@ -398,6 +380,11 @@ public class AcidIslandCommand implements CommandExecutor {
 
         Island ownIsland = plugin.getIslandManager().getIslandByOwner(player.getUniqueId());
         if (ownIsland != null) {
+            if (args.length < 2 || !args[1].equalsIgnoreCase("confirm")) {
+                player.sendMessage(plugin.getConfigManager().format("&cKamu masih punya island sendiri. Kalau lanjut, island kamu akan dihapus permanen."));
+                player.sendMessage(plugin.getConfigManager().format("&eGunakan &b/ai accept confirm &euntuk konfirmasi bergabung."));
+                return;
+            }
             Island deleted = plugin.getIslandManager().deleteIsland(player.getUniqueId());
             if (deleted != null) {
                 teleportParticipantsToLobby(deleted);
@@ -495,6 +482,10 @@ public class AcidIslandCommand implements CommandExecutor {
         Island island = plugin.getIslandManager().getIslandByOwner(player.getUniqueId());
         if (island == null) {
             player.sendMessage(plugin.getConfigManager().getMessage(player, "no-island"));
+            return;
+        }
+        if (!plugin.getIslandManager().canDeleteIsland(player.getUniqueId())) {
+            player.sendMessage(plugin.getConfigManager().format("&cKamu baru bisa menghapus island lagi dalam " + formatDuration(plugin.getIslandManager().getDeleteCooldownRemainingMillis(player.getUniqueId())) + "."));
             return;
         }
         plugin.getIslandGUI().openDeleteConfirmGUI(player, island);
@@ -717,6 +708,16 @@ public class AcidIslandCommand implements CommandExecutor {
 
     private boolean hasAdminPermission(CommandSender sender) {
         return !(sender instanceof Player) || sender.hasPermission("acidisland.admin");
+    }
+
+    private String formatDuration(long millis) {
+        long seconds = Math.max(0L, (millis + 999L) / 1000L);
+        long minutes = seconds / 60L;
+        long remainingSeconds = seconds % 60L;
+        if (minutes <= 0L) {
+            return remainingSeconds + " detik";
+        }
+        return minutes + " menit " + remainingSeconds + " detik";
     }
 
     private void sendHelp(CommandSender sender, String label) {

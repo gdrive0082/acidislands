@@ -13,14 +13,22 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
 import org.bukkit.event.entity.*;
-import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.hanging.HangingBreakByEntityEvent;
+import org.bukkit.event.hanging.HangingPlaceEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class IslandProtectionListener implements Listener {
 
     private final AcidIsland plugin;
+    private final Set<UUID> pluginFlightPlayers = new HashSet<>();
+    private final Map<UUID, Boolean> previousAllowFlight = new HashMap<>();
 
     public IslandProtectionListener(AcidIsland plugin) {
         this.plugin = plugin;
@@ -32,14 +40,19 @@ public class IslandProtectionListener implements Listener {
         new BukkitRunnable() {
             @Override
             public void run() {
+                String acidWorldName = plugin.getConfigManager().getConfig().getString("world-name", "acid_island_world");
                 for (Player player : Bukkit.getOnlinePlayers()) {
+                    UUID uuid = player.getUniqueId();
+                    if (!player.getWorld().getName().equals(acidWorldName)) {
+                        disablePluginFlight(player);
+                        continue;
+                    }
                     if (player.getGameMode() == org.bukkit.GameMode.CREATIVE || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
                         continue;
                     }
 
                     Island island = plugin.getIslandManager().getIslandAt(player.getLocation());
                     if (island != null) {
-                        UUID uuid = player.getUniqueId();
                         boolean isMember = island.isMember(uuid);
 
                         // 1. Weather Lock
@@ -58,26 +71,15 @@ public class IslandProtectionListener implements Listener {
 
                         // 3. Fly Mode (Hanya untuk owner/member jika diaktifkan)
                         if (island.getPremiumSetting("fly-mode") && isMember) {
-                            player.setAllowFlight(true);
+                            enablePluginFlight(player);
                         } else {
-                            if (!player.getAllowFlight()) { // prevent setting to false if already false
-                                player.setAllowFlight(false);
-                            } else if (player.isFlying() && !isMember) {
-                                player.setAllowFlight(false);
-                                player.setFlying(false);
-                            } else if (player.isFlying() && !island.getPremiumSetting("fly-mode")) {
-                                player.setAllowFlight(false);
-                                player.setFlying(false);
-                            }
+                            disablePluginFlight(player);
                         }
                     } else {
                         // Reset when leaving island
                         player.resetPlayerWeather();
                         player.resetPlayerTime();
-                        if (player.getAllowFlight()) {
-                            player.setAllowFlight(false);
-                            player.setFlying(false);
-                        }
+                        disablePluginFlight(player);
                     }
                 }
             }
@@ -107,6 +109,20 @@ public class IslandProtectionListener implements Listener {
                 event.setCancelled(true);
             }
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onVisitorEntityDamage(EntityDamageByEntityEvent event) {
+        if (event.getEntity() instanceof Player) return;
+
+        Player damager = getResponsiblePlayer(event.getDamager());
+        if (damager == null || damager.getGameMode() == org.bukkit.GameMode.CREATIVE) return;
+
+        Island island = plugin.getIslandManager().getIslandAt(event.getEntity().getLocation());
+        if (island == null || island.isMember(damager.getUniqueId())) return;
+
+        event.setCancelled(true);
+        damager.sendMessage(plugin.getConfigManager().getMessage(damager, "no-permission"));
     }
 
     @EventHandler(priority = EventPriority.HIGH)
@@ -171,10 +187,33 @@ public class IslandProtectionListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGH)
+    public void onBucketEmpty(PlayerBucketEmptyEvent event) {
+        if (!canBuild(event.getPlayer(), event.getBlock().getLocation())) {
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(plugin.getConfigManager().getMessage(event.getPlayer(), "no-permission"));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onBucketFill(PlayerBucketFillEvent event) {
+        if (!canBuild(event.getPlayer(), event.getBlock().getLocation())) {
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(plugin.getConfigManager().getMessage(event.getPlayer(), "no-permission"));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         if (player.getGameMode() == org.bukkit.GameMode.CREATIVE) return;
         if (event.getClickedBlock() == null) return;
+
+        if (event.getAction() == org.bukkit.event.block.Action.PHYSICAL) {
+            if (!canBuild(player, event.getClickedBlock().getLocation())) {
+                event.setCancelled(true);
+            }
+            return;
+        }
 
         Island island = plugin.getIslandManager().getIslandAt(event.getClickedBlock().getLocation());
         if (island == null) return;
@@ -209,6 +248,42 @@ public class IslandProtectionListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onInteractEntity(PlayerInteractEntityEvent event) {
+        Player player = event.getPlayer();
+        if (player.getGameMode() == org.bukkit.GameMode.CREATIVE) return;
+
+        Island island = plugin.getIslandManager().getIslandAt(event.getRightClicked().getLocation());
+        if (island == null || island.isMember(player.getUniqueId())) return;
+
+        if (!island.getBasicSetting("interaction")) {
+            event.setCancelled(true);
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onHangingBreak(HangingBreakByEntityEvent event) {
+        Player player = getResponsiblePlayer(event.getRemover());
+        if (player == null || player.getGameMode() == org.bukkit.GameMode.CREATIVE) return;
+
+        if (!canBuild(player, event.getEntity().getLocation())) {
+            event.setCancelled(true);
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onHangingPlace(HangingPlaceEvent event) {
+        Player player = event.getPlayer();
+        if (player == null || player.getGameMode() == org.bukkit.GameMode.CREATIVE) return;
+
+        if (!canBuild(player, event.getEntity().getLocation())) {
+            event.setCancelled(true);
+            player.sendMessage(plugin.getConfigManager().getMessage(player, "no-permission"));
+        }
+    }
+
     // ==========================================
     // Premium Settings
     // ==========================================
@@ -218,11 +293,19 @@ public class IslandProtectionListener implements Listener {
         Island island = plugin.getIslandManager().getIslandAt(event.getLocation());
         if (island == null) return;
 
-        if (event.getEntityType() == EntityType.CREEPER || event.getEntityType() == EntityType.TNT) {
-            if (!island.getPremiumSetting("creeper-explosion")) {
-                // Cancel block damage but allow particle/sound
-                event.blockList().clear();
-            }
+        if (!island.getPremiumSetting("creeper-explosion")) {
+            // Cancel block damage but allow particle/sound
+            event.blockList().clear();
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onBlockExplode(BlockExplodeEvent event) {
+        Island island = plugin.getIslandManager().getIslandAt(event.getBlock().getLocation());
+        if (island == null) return;
+
+        if (!island.getPremiumSetting("creeper-explosion")) {
+            event.blockList().clear();
         }
     }
 
@@ -264,6 +347,12 @@ public class IslandProtectionListener implements Listener {
         if (island == null) return;
 
         if (!island.getPremiumSetting("fire-spread")) {
+            Player player = event.getPlayer();
+            if (event.getCause() == BlockIgniteEvent.IgniteCause.FLINT_AND_STEEL
+                    && player != null
+                    && island.isMember(player.getUniqueId())) {
+                return;
+            }
             event.setCancelled(true);
         }
     }
@@ -323,6 +412,59 @@ public class IslandProtectionListener implements Listener {
 
         if (!island.getPremiumSetting("fall-damage")) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        Island island = plugin.getIslandManager().getIslandByPlayer(player.getUniqueId());
+        if (island != null) {
+            event.setRespawnLocation(island.getHome(plugin.getWorldManager().getAcidWorld()));
+        } else {
+            event.setRespawnLocation(plugin.getLobbyLocation());
+        }
+    }
+
+    private boolean canBuild(Player player, Location location) {
+        Island island = plugin.getIslandManager().getIslandAt(location);
+        if (island == null || island.isMember(player.getUniqueId())) {
+            return true;
+        }
+        return island.getBasicSetting("block-place") && island.getBasicSetting("block-break");
+    }
+
+    private Player getResponsiblePlayer(Entity entity) {
+        if (entity instanceof Player player) {
+            return player;
+        }
+        if (entity instanceof Projectile projectile && projectile.getShooter() instanceof Player player) {
+            return player;
+        }
+        return null;
+    }
+
+    private void enablePluginFlight(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (!pluginFlightPlayers.contains(uuid)) {
+            previousAllowFlight.put(uuid, player.getAllowFlight());
+            pluginFlightPlayers.add(uuid);
+        }
+        player.setAllowFlight(true);
+    }
+
+    private void disablePluginFlight(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (!pluginFlightPlayers.remove(uuid)) {
+            return;
+        }
+        boolean previous = previousAllowFlight.getOrDefault(uuid, false);
+        previousAllowFlight.remove(uuid);
+        if (!previous && player.getAllowFlight()) {
+            player.setFlying(false);
+            player.setAllowFlight(false);
+        } else if (previous) {
+            player.setAllowFlight(true);
         }
     }
 }

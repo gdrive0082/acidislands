@@ -24,7 +24,7 @@ public class SkullsHook {
         if (headIdOrName.startsWith("hdb:") && hdbEnabled) {
             try {
                 String id = headIdOrName.substring(4);
-                Class<?> apiClass = Class.forName("me.arcanepreventer.head-database.api.HeadDatabaseAPI");
+                Class<?> apiClass = Class.forName("me.arcaniax.hdb.api.HeadDatabaseAPI");
                 Object apiInstance = apiClass.getConstructor().newInstance();
                 Method getItemMethod = apiClass.getMethod("getItemHead", String.class);
                 ItemStack head = (ItemStack) getItemMethod.invoke(apiInstance, id);

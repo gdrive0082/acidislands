@@ -7,13 +7,16 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -21,13 +24,16 @@ import org.jetbrains.annotations.NotNull;
 import net.milkbowl.vault.economy.EconomyResponse;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 public class IslandGUI implements Listener {
 
     private final AcidIsland plugin;
+    private final Map<UUID, Inventory> openVaults = new HashMap<>();
 
     public IslandGUI(AcidIsland plugin) {
         this.plugin = plugin;
@@ -321,6 +327,28 @@ public class IslandGUI implements Listener {
         player.openInventory(inv);
     }
 
+    public void openVault(Player player, Island island) {
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        int level = island.getLevel("vault");
+        int rows = config.getInt("upgrades.vault." + level + ".rows", 1);
+        int size = rows * 9;
+
+        Inventory inv = openVaults.get(island.getOwner());
+        if (inv == null || inv.getSize() != size) {
+            inv = Bukkit.createInventory(new AcidIslandHolder("vault", island), size, plugin.getConfigManager().format("&6&lIsland Vault"));
+            String base64 = island.getVaultBase64();
+            if (base64 != null && !base64.isEmpty()) {
+                ItemStack[] items = Island.itemStackArrayFromBase64(base64);
+                for (int i = 0; i < Math.min(items.length, inv.getSize()); i++) {
+                    inv.setItem(i, items[i]);
+                }
+            }
+            openVaults.put(island.getOwner(), inv);
+        }
+
+        player.openInventory(inv);
+    }
+
     // ==========================================
     // Click Listener Handler
     // ==========================================
@@ -360,6 +388,14 @@ public class IslandGUI implements Listener {
         }
     }
 
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getInventory().getHolder() instanceof AcidIslandHolder holder)) return;
+        if (!holder.getGuiType().equals("vault")) {
+            event.setCancelled(true);
+        }
+    }
+
     private void handleStarterClick(Player player, int slot) {
         String type = "";
         if (slot == 11) type = "classic";
@@ -367,6 +403,11 @@ public class IslandGUI implements Listener {
         else if (slot == 15) type = "nether";
 
         if (!type.isEmpty()) {
+            if (!plugin.getIslandManager().canCreateIsland(player.getUniqueId())) {
+                player.closeInventory();
+                player.sendMessage(plugin.getConfigManager().format("&cKamu baru bisa membuat island lagi dalam " + formatDuration(plugin.getIslandManager().getCreateCooldownRemainingMillis(player.getUniqueId())) + "."));
+                return;
+            }
             player.closeInventory();
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
             
@@ -516,7 +557,9 @@ public class IslandGUI implements Listener {
             } else if (type.equals("minions")) {
                 // Integrasi AxMinions limit command jika terpasang
                 int minionLimit = config.getInt("upgrades.minions." + nextLvl + ".limit");
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "axminions limit set " + player.getName() + " " + minionLimit);
+                OfflinePlayer owner = Bukkit.getOfflinePlayer(island.getOwner());
+                String targetName = owner.getName() == null ? player.getName() : owner.getName();
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "axminions limit set " + targetName + " " + minionLimit);
             }
 
             player.sendMessage(plugin.getConfigManager().getMessage(player, "upgrade-success", "{upgrade}", type.toUpperCase(), "{level}", String.valueOf(nextLvl)));
@@ -529,6 +572,11 @@ public class IslandGUI implements Listener {
 
     private void handleDeleteConfirmClick(Player player, Island island, int slot) {
         if (slot == 11) {
+            if (!plugin.getIslandManager().canDeleteIsland(player.getUniqueId())) {
+                player.closeInventory();
+                player.sendMessage(plugin.getConfigManager().format("&cKamu baru bisa menghapus island lagi dalam " + formatDuration(plugin.getIslandManager().getDeleteCooldownRemainingMillis(player.getUniqueId())) + "."));
+                return;
+            }
             // Confirm delete
             player.closeInventory();
             player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
@@ -634,6 +682,16 @@ public class IslandGUI implements Listener {
         return ids;
     }
 
+    private String formatDuration(long millis) {
+        long seconds = Math.max(0L, (millis + 999L) / 1000L);
+        long minutes = seconds / 60L;
+        long remainingSeconds = seconds % 60L;
+        if (minutes <= 0L) {
+            return remainingSeconds + " detik";
+        }
+        return minutes + " menit " + remainingSeconds + " detik";
+    }
+
     private void teleportParticipantsToLobby(Island island) {
         Location lobby = plugin.getLobbyLocation();
         for (UUID uuid : island.getParticipants()) {
@@ -646,14 +704,20 @@ public class IslandGUI implements Listener {
     }
 
     @EventHandler
-    public void onInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+    public void onInventoryClose(InventoryCloseEvent event) {
         if (event.getInventory().getHolder() instanceof AcidIslandHolder holder) {
             if (holder.getGuiType().equals("vault")) {
                 Island island = holder.getIsland();
                 if (island != null) {
-                    String base64 = Island.itemStackArrayToBase64(event.getInventory().getContents());
+                    Inventory inventory = event.getInventory();
+                    String base64 = Island.itemStackArrayToBase64(inventory.getContents());
                     island.setVaultBase64(base64);
                     plugin.getIslandManager().saveData();
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (inventory.getViewers().isEmpty()) {
+                            openVaults.remove(island.getOwner(), inventory);
+                        }
+                    });
                 }
             }
         }

@@ -65,13 +65,14 @@ public class WorldManager {
         Material subMat = Material.DIRT;
         Material fenceMat = Material.OAK_FENCE;
         TreeType treeType = TreeType.TREE;
+        boolean netherStarter = type.equalsIgnoreCase("nether");
 
         if (type.equalsIgnoreCase("desert")) {
             surfaceMat = Material.SAND;
             subMat = Material.SANDSTONE;
             fenceMat = Material.ACACIA_FENCE;
             treeType = TreeType.ACACIA;
-        } else if (type.equalsIgnoreCase("nether")) {
+        } else if (netherStarter) {
             surfaceMat = Material.NETHERRACK;
             subMat = Material.NETHERRACK;
             fenceMat = Material.NETHER_BRICK_FENCE;
@@ -98,8 +99,14 @@ public class WorldManager {
         world.getBlockAt(cx, 61, cz).setType(Material.BEDROCK);
 
         // 4. Generate Tree di tengah (Y=76)
+        if (netherStarter) {
+            world.getBlockAt(cx, islandY, cz).setType(Material.CRIMSON_NYLIUM);
+        }
         Location treeLoc = new Location(world, cx, islandY + 1, cz);
-        world.generateTree(treeLoc, treeType);
+        boolean treeGenerated = world.generateTree(treeLoc, treeType);
+        if (!treeGenerated && netherStarter) {
+            generateFallbackCrimsonFungus(cx, islandY + 1, cz);
+        }
 
         // 5. Generate Chest starter (Y=76)
         Location chestLoc = new Location(world, cx + 2, islandY + 1, cz + 2);
@@ -120,11 +127,32 @@ public class WorldManager {
         sheep.setColor(DyeColor.WHITE);
 
         // Pasang tali (leash) ke fence menggunakan LeashHitch
-        LeashHitch hitch = world.spawn(fenceLoc, LeashHitch.class);
-        sheep.setLeashHolder(hitch);
+        try {
+            LeashHitch hitch = world.spawn(fenceLoc, LeashHitch.class);
+            sheep.setLeashHolder(hitch);
+        } catch (IllegalArgumentException ex) {
+            plugin.getLogger().warning("Failed to attach starter sheep leash at " + cx + ", " + cz + ": " + ex.getMessage());
+        }
 
         // 7. Generate Mini Ocean Monument di bawah air (Y=40)
         generateMiniMonument(cx, 40, cz);
+    }
+
+    private void generateFallbackCrimsonFungus(int cx, int baseY, int cz) {
+        World world = getAcidWorld();
+        for (int y = baseY; y <= baseY + 5; y++) {
+            world.getBlockAt(cx, y, cz).setType(Material.CRIMSON_STEM);
+        }
+        for (int x = cx - 2; x <= cx + 2; x++) {
+            for (int z = cz - 2; z <= cz + 2; z++) {
+                for (int y = baseY + 4; y <= baseY + 6; y++) {
+                    if (Math.abs(x - cx) + Math.abs(z - cz) <= 3) {
+                        world.getBlockAt(x, y, z).setType(Material.NETHER_WART_BLOCK);
+                    }
+                }
+            }
+        }
+        world.getBlockAt(cx, baseY + 5, cz).setType(Material.CRIMSON_STEM);
     }
 
     private void fillStarterChest(Inventory inv, String type) {

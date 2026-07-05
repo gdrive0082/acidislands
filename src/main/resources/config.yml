@@ -8,6 +8,14 @@ world-name: "acid_island_world"
 # Jarak antar pulau dalam block (agar border tidak bertubrukan)
 island-spacing: 400
 
+# Index grid awal. 1 membuat island pertama tidak tepat di spawn dunia acid.
+island-start-grid-index: 1
+
+# Cooldown create/delete island untuk mencegah farming reset island.
+cooldowns:
+  create-seconds: 1800
+  delete-seconds: 1800
+
 # Koordinat lobby awal (akan diisi via /ai setlobby)
 lobby:
   world: "world"
@@ -78,6 +86,8 @@ starters:
     icon: "NETHERRACK"
     chest-items:
       - "CRIMSON_FUNGUS:1"
+      - "CRIMSON_NYLIUM:4"
+      - "BONE_MEAL:8"
       - "ICE:2"
       - "LAVA_BUCKET:1"
       - "COOKED_PORKCHOP:16"
@@ -213,7 +223,7 @@ cleanup:
   enabled: true
   padding: 8
   min-y: -64
-  max-y: 160
+  max-y: 320
   columns-per-tick: 12
 
 # Island level dihitung dari value block di area border.
@@ -221,7 +231,7 @@ level:
   points-per-level: 100
   cache-seconds: 300
   scan-min-y: 63
-  scan-max-y: 160
+  scan-max-y: 320
   blocks-per-tick: 5000
   default-block-value: 1
   block-values:

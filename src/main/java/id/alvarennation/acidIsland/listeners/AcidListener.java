@@ -1,6 +1,7 @@
 package id.alvarennation.acidIsland.listeners;
 
 import id.alvarennation.acidIsland.AcidIsland;
+import id.alvarennation.acidIsland.island.Island;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -87,6 +88,10 @@ public class AcidListener implements Listener {
 
                     // 3. Toxic Rain Check
                     if (rainEnabled && hasStorm) {
+                        Island island = plugin.getIslandManager().getIslandAt(loc);
+                        if (island != null && island.getPremiumSetting("weather-lock")) {
+                            continue;
+                        }
                         // Check if player is exposed to the sky
                         int highestY = world.getHighestBlockYAt(loc.getBlockX(), loc.getBlockZ());
                         if (highestY <= loc.getY()) {
