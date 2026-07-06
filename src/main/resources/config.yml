@@ -1,10 +1,10 @@
 # ==========================================
 # AcidIsland Config File
-# Oceanfix6: waterline island surface with deep under-island shipwreck.
+# Oceanfix7: starter world border reduced to 15.
 # ==========================================
 
 # Versi template config.
-config-version: 14
+config-version: 15
 
 # Nama world tempat pulau AcidIsland dibuat.
 # acid-world adalah key aktif; world-name tetap dibaca sebagai fallback legacy.
@@ -147,7 +147,7 @@ upgrades:
   # Upgrade World Border
   border:
     1:
-      size: 50
+      size: 15
       cost: 0
     2:
       size: 75

@@ -78,7 +78,7 @@ public class ConfigManager {
 
     private void migrateConfig() {
         int previousVersion = config.getInt("config-version", 0);
-        int bundledVersion = 14;
+        int bundledVersion = 15;
         try (InputStream defaultsStream = plugin.getResource("config.yml")) {
             if (defaultsStream != null) {
                 FileConfiguration defaults = YamlConfiguration.loadConfiguration(
@@ -95,6 +95,7 @@ public class ConfigManager {
         migrateCooldown("cooldowns.create-seconds", previousVersion);
         migrateCooldown("cooldowns.delete-seconds", previousVersion);
         migrateStarterIslandLayout(previousVersion);
+        migrateStarterBorder(previousVersion);
         if (previousVersion < bundledVersion) {
             config.set("config-version", bundledVersion);
         }
@@ -116,6 +117,13 @@ public class ConfigManager {
         migrateIntWhenDefault("starter-island.shipwreck-offset-x", 20, 0);
         migrateIntWhenDefault("starter-island.shipwreck-offset-z", 17, 0);
         migrateIntWhenDefault("starter-island.shipwreck-depth-below-water", 5, 22);
+    }
+
+    private void migrateStarterBorder(int previousVersion) {
+        if (previousVersion >= 15) {
+            return;
+        }
+        migrateIntWhenDefault("upgrades.border.1.size", 50, 15);
     }
 
     private void migrateIntWhenDefault(String path, int oldDefault, int newDefault) {
