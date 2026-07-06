@@ -1,10 +1,10 @@
 # ==========================================
 # AcidIsland Config File
-# Oceanfix5: world storage self-repair, lower shoreline island, distant shipwreck monument.
+# Oceanfix6: waterline island surface with deep under-island shipwreck.
 # ==========================================
 
 # Versi template config.
-config-version: 13
+config-version: 14
 
 # Nama world tempat pulau AcidIsland dibuat.
 # acid-world adalah key aktif; world-name tetap dibaca sebagai fallback legacy.
@@ -24,12 +24,13 @@ island-start-grid-index: 1
 
 # Bentuk starter island dan struktur eksplorasi.
 starter-island:
-  # Surface island = acid-water.height + offset. 2 berarti pulau hanya sedikit di atas air.
-  surface-offset-above-water: 2
-  # Shipwreck dibuat agak jauh dari pulau, masih dalam area cleanup island.
-  shipwreck-offset-x: 20
-  shipwreck-offset-z: 17
-  shipwreck-depth-below-water: 5
+  # Surface island = acid-water.height + offset. 0 berarti permukaan pulau sejajar permukaan air.
+  surface-offset-above-water: 0
+  # 0/0 membuat shipwreck berada tepat di bawah island, bukan di samping island.
+  shipwreck-offset-x: 0
+  shipwreck-offset-z: 0
+  # Kedalaman minimal 22 blok agar kapal benar-benar tenggelam di bawah island.
+  shipwreck-depth-below-water: 22
 
 # Cooldown create/delete island untuk mencegah farming reset island.
 cooldowns:

@@ -188,8 +188,8 @@ public class WorldManager {
     public CompletableFuture<Void> preloadStarterIslandChunks(int cx, int cz) {
         World world = getAcidWorld();
         FileConfiguration config = plugin.getConfigManager().getConfig();
-        int shipX = cx + config.getInt("starter-island.shipwreck-offset-x", 20);
-        int shipZ = cz + config.getInt("starter-island.shipwreck-offset-z", 17);
+        int shipX = cx + config.getInt("starter-island.shipwreck-offset-x", 0);
+        int shipZ = cz + config.getInt("starter-island.shipwreck-offset-z", 0);
         int minChunkX = blockToChunk(Math.min(cx - 12, shipX - 18));
         int maxChunkX = blockToChunk(Math.max(cx + 12, shipX + 18));
         int minChunkZ = blockToChunk(Math.min(cz - 8, shipZ - 10));
@@ -211,7 +211,7 @@ public class WorldManager {
     public int getStarterIslandY() {
         FileConfiguration config = plugin.getConfigManager().getConfig();
         int waterHeight = config.getInt("acid-water.height", 62);
-        int offset = Math.max(1, config.getInt("starter-island.surface-offset-above-water", 2));
+        int offset = Math.max(0, config.getInt("starter-island.surface-offset-above-water", 0));
         return waterHeight + offset;
     }
 
@@ -408,9 +408,9 @@ public class WorldManager {
     private void generateShipwreckMonument(int islandX, int waterHeight, int islandZ, Random random) {
         World world = getAcidWorld();
         FileConfiguration config = plugin.getConfigManager().getConfig();
-        int cx = islandX + config.getInt("starter-island.shipwreck-offset-x", 20);
-        int cz = islandZ + config.getInt("starter-island.shipwreck-offset-z", 17);
-        int depth = Math.max(2, config.getInt("starter-island.shipwreck-depth-below-water", 5));
+        int cx = islandX + config.getInt("starter-island.shipwreck-offset-x", 0);
+        int cz = islandZ + config.getInt("starter-island.shipwreck-offset-z", 0);
+        int depth = Math.max(22, config.getInt("starter-island.shipwreck-depth-below-water", 22));
         int cy = Math.max(world.getMinHeight() + 12, waterHeight - depth);
 
         generateShipwreckHull(world, cx, cy, cz, waterHeight);
