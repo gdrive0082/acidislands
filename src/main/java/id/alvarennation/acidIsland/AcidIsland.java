@@ -54,6 +54,7 @@ public final class AcidIsland extends JavaPlugin {
 
         // 3. Setup World and Island Managers
         this.worldManager = new WorldManager(this);
+        Bukkit.getPluginManager().registerEvents(new WorldLifecycleListener(this), this);
         this.worldManager.initWorld(); // Load/Create toxic ocean world
 
         this.islandManager = new IslandManager(this);
@@ -65,7 +66,6 @@ public final class AcidIsland extends JavaPlugin {
         // 4. Register Listeners
         Bukkit.getPluginManager().registerEvents(new AcidListener(this), this);
         Bukkit.getPluginManager().registerEvents(new IslandProtectionListener(this), this);
-        Bukkit.getPluginManager().registerEvents(new WorldLifecycleListener(this), this);
         this.generatorListener = new GeneratorListener(this);
         Bukkit.getPluginManager().registerEvents(generatorListener, this);
         Bukkit.getPluginManager().registerEvents(islandGUI, this);

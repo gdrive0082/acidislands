@@ -238,6 +238,29 @@ public class WorldManager {
         return Math.floorDiv(blockCoordinate, 16);
     }
 
+    public void normalizeNewAcidChunk(Chunk chunk) {
+        World world = chunk.getWorld();
+        if (!world.getName().equals(plugin.getConfigManager().getAcidWorldName())) {
+            return;
+        }
+        int waterHeight = plugin.getConfigManager().getConfig().getInt("acid-water.height", 62);
+        int minY = world.getMinHeight();
+        int maxY = world.getMaxHeight() - 1;
+        int maxWaterY = Math.min(waterHeight, maxY);
+
+        for (int localX = 0; localX < 16; localX++) {
+            for (int localZ = 0; localZ < 16; localZ++) {
+                for (int y = minY; y <= maxY; y++) {
+                    Material target = y <= maxWaterY ? Material.WATER : Material.AIR;
+                    Block block = chunk.getBlock(localX, y, localZ);
+                    if (block.getType() != target) {
+                        block.setType(target, false);
+                    }
+                }
+            }
+        }
+    }
+
     public int getStarterIslandY() {
         FileConfiguration config = plugin.getConfigManager().getConfig();
         int waterHeight = config.getInt("acid-water.height", 62);

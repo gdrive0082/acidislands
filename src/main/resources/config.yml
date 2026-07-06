@@ -1,6 +1,6 @@
 # ==========================================
 # AcidIsland Config File
-# Oceanfix10: starter border fallback 15 and deep structures at 60 blocks.
+# Oceanfix11: guarded acid ocean generation for every new acid-world chunk.
 # ==========================================
 
 # Versi template config.
