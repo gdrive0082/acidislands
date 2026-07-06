@@ -11,6 +11,7 @@ import id.alvarennation.acidIsland.island.IslandManager;
 import id.alvarennation.acidIsland.listeners.AcidListener;
 import id.alvarennation.acidIsland.listeners.GeneratorListener;
 import id.alvarennation.acidIsland.listeners.IslandProtectionListener;
+import id.alvarennation.acidIsland.listeners.WorldLifecycleListener;
 import id.alvarennation.acidIsland.quest.QuestManager;
 import id.alvarennation.acidIsland.world.VoidWorldGenerator;
 import id.alvarennation.acidIsland.world.WorldManager;
@@ -64,6 +65,7 @@ public final class AcidIsland extends JavaPlugin {
         // 4. Register Listeners
         Bukkit.getPluginManager().registerEvents(new AcidListener(this), this);
         Bukkit.getPluginManager().registerEvents(new IslandProtectionListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new WorldLifecycleListener(this), this);
         this.generatorListener = new GeneratorListener(this);
         Bukkit.getPluginManager().registerEvents(generatorListener, this);
         Bukkit.getPluginManager().registerEvents(islandGUI, this);

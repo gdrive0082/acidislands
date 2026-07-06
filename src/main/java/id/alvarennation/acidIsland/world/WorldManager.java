@@ -80,12 +80,38 @@ public class WorldManager {
     }
 
     public World getAcidWorld() {
-        if (acidWorld == null) {
+        String worldName = plugin.getConfigManager().getAcidWorldName();
+        World loadedWorld = Bukkit.getWorld(worldName);
+        if (loadedWorld == null) {
+            acidWorld = null;
             initWorld();
+        } else if (acidWorld == null || !acidWorld.equals(loadedWorld)) {
+            acidWorld = loadedWorld;
+            ensureWorldStorageDirectories(acidWorld);
+            startStorageWatchdog();
         } else {
             ensureWorldStorageDirectories(acidWorld);
         }
+        if (acidWorld == null) {
+            throw new IllegalStateException("Acid world could not be loaded or created: " + worldName);
+        }
         return acidWorld;
+    }
+
+    public World repairAcidWorld() {
+        acidWorld = null;
+        return getAcidWorld();
+    }
+
+    public void markAcidWorldUnavailable(String reason) {
+        String worldName = plugin.getConfigManager().getAcidWorldName();
+        if (acidWorld == null || !acidWorld.getName().equals(worldName)) {
+            return;
+        }
+        acidWorld = null;
+        cancelScheduledWorldTasks();
+        cancelIslandValueScans();
+        plugin.getLogger().warning("Acid world '" + worldName + "' became unavailable (" + reason + "). It will be recreated on the next AcidIsland world access.");
     }
 
     private void startStorageWatchdog() {
@@ -103,10 +129,14 @@ public class WorldManager {
                     cancel();
                     return;
                 }
-                World world = acidWorld;
-                if (world != null) {
-                    ensureWorldStorageDirectories(world);
+                String worldName = plugin.getConfigManager().getAcidWorldName();
+                World loadedWorld = Bukkit.getWorld(worldName);
+                if (loadedWorld == null) {
+                    acidWorld = null;
+                    return;
                 }
+                acidWorld = loadedWorld;
+                ensureWorldStorageDirectories(loadedWorld);
             }
         }.runTaskTimer(plugin, interval, interval);
     }
@@ -337,6 +367,26 @@ public class WorldManager {
             placeCactus(world, cx - 4, islandY + 1, cz + 1, 2);
             setBlock(world, cx + 2, islandY + 1, cz - 4, Material.DEAD_BUSH);
             setBlock(world, cx - 1, islandY + 1, cz + 4, Material.CUT_SANDSTONE);
+        } else if (type.equals("badlands")) {
+            placeCactus(world, cx - 4, islandY + 1, cz + 1, 1);
+            setBlock(world, cx + 2, islandY + 1, cz - 4, Material.DEAD_BUSH);
+            setBlock(world, cx - 1, islandY + 1, cz + 4, Material.ORANGE_TERRACOTTA);
+        } else if (type.equals("mushroom")) {
+            setBlock(world, cx - 3, islandY + 1, cz + 2, Material.BROWN_MUSHROOM);
+            setBlock(world, cx + 3, islandY + 1, cz - 2, Material.RED_MUSHROOM);
+            setBlock(world, cx - 2, islandY + 1, cz - 3, Material.MOSS_CARPET);
+        } else if (type.equals("taiga") || type.equals("snow")) {
+            setBlock(world, cx - 3, islandY + 1, cz + 2, Material.SPRUCE_LOG);
+            setBlock(world, cx - 2, islandY + 1, cz + 2, Material.FERN);
+            if (type.equals("snow")) {
+                setBlock(world, cx + 3, islandY + 1, cz - 2, Material.SNOW);
+            } else {
+                setBlock(world, cx + 3, islandY + 1, cz - 2, Material.SWEET_BERRY_BUSH);
+            }
+        } else if (type.equals("mangrove")) {
+            setBlock(world, cx - 3, islandY + 1, cz + 2, Material.MANGROVE_ROOTS);
+            setBlock(world, cx - 2, islandY + 1, cz + 2, Material.MOSS_CARPET);
+            setBlock(world, cx + 3, islandY + 1, cz - 2, Material.CLAY);
         } else if (type.equals("nether")) {
             setBlock(world, cx - 4, islandY + 1, cz + 1, Material.BASALT);
             setBlock(world, cx - 4, islandY + 2, cz + 1, Material.BASALT);
@@ -355,6 +405,31 @@ public class WorldManager {
         }
         if (type.equals("desert")) {
             Material[] options = {Material.DEAD_BUSH, Material.SANDSTONE_SLAB, Material.SMOOTH_SANDSTONE_SLAB};
+            setBlock(world, x, y, z, options[random.nextInt(options.length)]);
+            return;
+        }
+        if (type.equals("badlands")) {
+            Material[] options = {Material.DEAD_BUSH, Material.RED_SANDSTONE_SLAB, Material.ORANGE_TERRACOTTA};
+            setBlock(world, x, y, z, options[random.nextInt(options.length)]);
+            return;
+        }
+        if (type.equals("mushroom")) {
+            Material[] options = {Material.BROWN_MUSHROOM, Material.RED_MUSHROOM, Material.MOSS_CARPET};
+            setBlock(world, x, y, z, options[random.nextInt(options.length)]);
+            return;
+        }
+        if (type.equals("taiga")) {
+            Material[] options = {Material.FERN, Material.SWEET_BERRY_BUSH, Material.SPRUCE_SAPLING};
+            setBlock(world, x, y, z, options[random.nextInt(options.length)]);
+            return;
+        }
+        if (type.equals("snow")) {
+            Material[] options = {Material.SNOW, Material.FERN, Material.SPRUCE_SAPLING};
+            setBlock(world, x, y, z, options[random.nextInt(options.length)]);
+            return;
+        }
+        if (type.equals("mangrove")) {
+            Material[] options = {Material.MOSS_CARPET, Material.MANGROVE_ROOTS, Material.CLAY};
             setBlock(world, x, y, z, options[random.nextInt(options.length)]);
             return;
         }
@@ -1062,6 +1137,56 @@ public class WorldManager {
                         Material.NETHER_BRICK_FENCE,
                         TreeType.CRIMSON_FUNGUS,
                         true
+                );
+                case "taiga" -> new StarterPalette(
+                        Material.PODZOL,
+                        Material.COARSE_DIRT,
+                        Material.MOSS_BLOCK,
+                        Material.DIRT,
+                        Material.ROOTED_DIRT,
+                        Material.SPRUCE_FENCE,
+                        TreeType.REDWOOD,
+                        false
+                );
+                case "mushroom" -> new StarterPalette(
+                        Material.MYCELIUM,
+                        Material.MOSS_BLOCK,
+                        Material.BROWN_MUSHROOM_BLOCK,
+                        Material.DIRT,
+                        Material.ROOTED_DIRT,
+                        Material.DARK_OAK_FENCE,
+                        TreeType.RED_MUSHROOM,
+                        false
+                );
+                case "badlands" -> new StarterPalette(
+                        Material.RED_SAND,
+                        Material.TERRACOTTA,
+                        Material.ORANGE_TERRACOTTA,
+                        Material.RED_SANDSTONE,
+                        Material.TERRACOTTA,
+                        Material.ACACIA_FENCE,
+                        TreeType.ACACIA,
+                        false
+                );
+                case "mangrove" -> new StarterPalette(
+                        Material.MUD,
+                        Material.MOSS_BLOCK,
+                        Material.CLAY,
+                        Material.MUD,
+                        Material.CLAY,
+                        Material.MANGROVE_FENCE,
+                        TreeType.MANGROVE,
+                        false
+                );
+                case "snow" -> new StarterPalette(
+                        Material.SNOW_BLOCK,
+                        Material.PODZOL,
+                        Material.PACKED_ICE,
+                        Material.DIRT,
+                        Material.STONE,
+                        Material.SPRUCE_FENCE,
+                        TreeType.REDWOOD,
+                        false
                 );
                 default -> new StarterPalette(
                         Material.GRASS_BLOCK,

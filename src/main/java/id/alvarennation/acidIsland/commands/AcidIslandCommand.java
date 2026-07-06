@@ -9,6 +9,7 @@ import id.alvarennation.acidIsland.quest.QuestManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -195,12 +196,17 @@ public class AcidIslandCommand implements CommandExecutor {
             handleAdminStory(sender, args, label);
             return;
         }
-        if (args.length < 3) {
-            sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp> <player> atau /" + label + " admin story <set|get|add> <player> [stage]");
+
+        String action = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "";
+        if (handleAdminMaintenanceAction(sender, args, label, action)) {
             return;
         }
 
-        String action = args[1].toLowerCase(Locale.ROOT);
+        if (args.length < 3) {
+            sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp|cleanup|scan> <player> atau /" + label + " admin <repairworld|worldtp|save|borders|scan all>");
+            return;
+        }
+
         OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
         UUID targetUuid = target.getUniqueId();
 
@@ -252,8 +258,92 @@ public class AcidIslandCommand implements CommandExecutor {
                 plugin.getWorldManager().applyWorldBorder(adminPlayer, island);
                 adminPlayer.sendMessage(plugin.getConfigManager().format("&aTeleport ke island " + args[2] + "."));
             }
-            default -> sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp> <player> atau /" + label + " admin story <set|get|add> <player> [stage]");
+            case "cleanup" -> {
+                Island island = plugin.getIslandManager().getIslandByPlayer(targetUuid);
+                if (island == null) {
+                    sender.sendMessage("§cPlayer tersebut tidak punya island.");
+                    return;
+                }
+                plugin.getWorldManager().scheduleIslandCleanup(island);
+                sender.sendMessage("§aCleanup island " + args[2] + " dijadwalkan.");
+            }
+            case "scan" -> {
+                Island island = plugin.getIslandManager().getIslandByPlayer(targetUuid);
+                if (island == null) {
+                    sender.sendMessage("§cPlayer tersebut tidak punya island.");
+                    return;
+                }
+                plugin.getWorldManager().scheduleIslandValueScan(island);
+                sender.sendMessage("§aScan level island " + args[2] + " dijadwalkan.");
+            }
+            default -> sender.sendMessage("§cPenggunaan: /" + label + " admin <delete|reset|tp|cleanup|scan> <player> atau /" + label + " admin <repairworld|worldtp|save|borders|scan all>");
         }
+    }
+
+    private boolean handleAdminMaintenanceAction(CommandSender sender, String[] args, String label, String action) {
+        switch (action) {
+            case "repairworld" -> {
+                World world = plugin.getWorldManager().repairAcidWorld();
+                sender.sendMessage("§aAcid world siap: §e" + world.getName() + "§a.");
+                return true;
+            }
+            case "worldtp" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("§cCommand worldtp hanya bisa dipakai player.");
+                    return true;
+                }
+                World world = plugin.getWorldManager().getAcidWorld();
+                int waterHeight = plugin.getConfigManager().getConfig().getInt("acid-water.height", 62);
+                player.teleport(new Location(world, 0.5, waterHeight + 4.0, 0.5, 0.0f, 0.0f));
+                player.setWorldBorder(null);
+                player.sendMessage(plugin.getConfigManager().format("&aTeleport ke acid world &e" + world.getName() + "&a."));
+                return true;
+            }
+            case "save" -> {
+                plugin.getIslandGUI().flushAllVaults();
+                plugin.getIslandManager().saveData();
+                sender.sendMessage("§aData AcidIsland dan vault berhasil disimpan.");
+                return true;
+            }
+            case "borders" -> {
+                int refreshed = refreshOnlineBorders();
+                sender.sendMessage("§aWorld border online direfresh untuk §e" + refreshed + "§a player.");
+                return true;
+            }
+            case "scan" -> {
+                if (args.length >= 3 && args[2].equalsIgnoreCase("all")) {
+                    int queued = 0;
+                    for (Island island : plugin.getIslandManager().getAllIslands()) {
+                        plugin.getWorldManager().scheduleIslandValueScan(island);
+                        queued++;
+                    }
+                    sender.sendMessage("§aScan level dijadwalkan untuk §e" + queued + "§a island.");
+                    return true;
+                }
+                if (args.length < 3) {
+                    sender.sendMessage("§cPenggunaan: /" + label + " admin scan <player|all>");
+                    return true;
+                }
+                return false;
+            }
+            default -> {
+                return false;
+            }
+        }
+    }
+
+    private int refreshOnlineBorders() {
+        World acidWorld = plugin.getWorldManager().getAcidWorld();
+        int refreshed = 0;
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            Island island = plugin.getIslandManager().getIslandByPlayer(online.getUniqueId());
+            if (island == null || !online.getWorld().equals(acidWorld)) {
+                continue;
+            }
+            plugin.getWorldManager().applyWorldBorder(online, island);
+            refreshed++;
+        }
+        return refreshed;
     }
 
     private void handleAdminStory(CommandSender sender, String[] args, String label) {

@@ -66,6 +66,16 @@ public class AcidIslandTabCompleter implements TabCompleter {
                 return filter(AcidIslandCommandSpec.ADMIN_STORY_ACTIONS, args[2]);
             }
             if (sub.equals("admin")) {
+                if (args[1].equalsIgnoreCase("scan")) {
+                    List<String> values = new java.util.ArrayList<>(onlinePlayerNames(sender, args[2]));
+                    if ("all".startsWith(args[2].toLowerCase(Locale.ROOT))) {
+                        values.add("all");
+                    }
+                    return values;
+                }
+                if (List.of("repairworld", "worldtp", "save", "borders").contains(args[1].toLowerCase(Locale.ROOT))) {
+                    return List.of();
+                }
                 return onlinePlayerNames(sender, args[2]);
             }
         }

@@ -308,7 +308,12 @@ public class IslandGUI implements Listener {
         inv.setItem(15, createGuiItem(Material.ENDER_PEARL, "&eTeleport Lobby", "&7Teleport kamu ke lobby AcidIsland.", "&eKlik untuk teleport."));
         inv.setItem(16, createGuiItem(Material.AMETHYST_SHARD, "&dStory Tools", "&7Buka player manager lalu pilih player.", "&7Stage bisa +1, +5, -1, atau reset."));
 
+        inv.setItem(19, createGuiItem(Material.RECOVERY_COMPASS, "&aRepair Acid World", "&7Recreate/load acid world jika dihapus eksternal.", "&eKlik untuk repair."));
+        inv.setItem(20, createGuiItem(Material.COMPASS, "&bTeleport Acid World", "&7Teleport admin ke acid world.", "&eKlik untuk teleport."));
+        inv.setItem(21, createGuiItem(Material.BEACON, "&aRefresh Online Borders", "&7Terapkan ulang world border player online.", "&eKlik untuk refresh."));
         inv.setItem(22, createGuiItem(Material.CHEST, "&6Open Own Dashboard", "&7Buka dashboard /ai milikmu.", "&eKlik untuk membuka."));
+        inv.setItem(23, createGuiItem(Material.EXPERIENCE_BOTTLE, "&aScan All Island Levels", "&7Jadwalkan scan value semua island.", "&eKlik untuk scan."));
+        inv.setItem(24, createGuiItem(Material.ENDER_CHEST, "&eClose AcidIsland GUIs", "&7Tutup inventory AcidIsland yang sedang terbuka.", "&eKlik untuk tutup."));
         inv.setItem(31, createGuiItem(Material.BARRIER, "&cTutup", "&7Tutup menu admin."));
 
         fillFiller(inv);
@@ -387,6 +392,9 @@ public class IslandGUI implements Listener {
 
         inv.setItem(20, createGuiItem(Material.IRON_BARS, "&eRemove From Current Island", island == null || island.isOwner(targetUuid) ? "&cHanya untuk member non-owner." : "&7Keluarkan player dari island saat ini."));
         inv.setItem(21, createGuiItem(Material.BELL, "&eSend To Lobby", onlineTarget == null ? "&cPlayer offline." : "&7Teleport player ke lobby."));
+        inv.setItem(22, createGuiItem(Material.WATER_BUCKET, "&bCleanup Island Area", island == null ? "&cPlayer tidak punya island." : "&7Jadwalkan cleanup area island player."));
+        inv.setItem(23, createGuiItem(Material.EXPERIENCE_BOTTLE, "&aScan Island Level", island == null ? "&cPlayer tidak punya island." : "&7Jadwalkan scan value island player."));
+        inv.setItem(24, createGuiItem(Material.BEACON, "&aRefresh Target Border", onlineTarget == null ? "&cPlayer offline." : "&7Terapkan ulang border target."));
         inv.setItem(31, createGuiItem(Material.ARROW, "&eKembali", "&7Kembali ke daftar player."));
 
         fillFiller(inv);
@@ -411,30 +419,41 @@ public class IslandGUI implements Listener {
     // 1. Starter Island Selection GUI
     // ==========================================
     public void openStarterGUI(Player player) {
-        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("starter", null), 27, plugin.getConfigManager().format("&a&lPilih Starter Island"));
+        Inventory inv = Bukkit.createInventory(new AcidIslandHolder("starter", null), 36, plugin.getConfigManager().format("&a&lPilih Starter Island"));
 
         FileConfiguration config = plugin.getConfigManager().getConfig();
-
-        // Classic
-        Material classicIcon = Material.matchMaterial(config.getString("starters.classic.icon", "OAK_SAPLING"));
-        if (classicIcon == null) classicIcon = Material.OAK_SAPLING;
-        List<String> classicLore = config.getStringList("starters.classic.lore");
-        inv.setItem(11, createGuiItem(classicIcon, config.getString("starters.classic.display-name", "&aClassic Island"), classicLore.toArray(new String[0])));
-
-        // Desert
-        Material desertIcon = Material.matchMaterial(config.getString("starters.desert.icon", "SAND"));
-        if (desertIcon == null) desertIcon = Material.SAND;
-        List<String> desertLore = config.getStringList("starters.desert.lore");
-        inv.setItem(13, createGuiItem(desertIcon, config.getString("starters.desert.display-name", "&eDesert Island"), desertLore.toArray(new String[0])));
-
-        // Nether
-        Material netherIcon = Material.matchMaterial(config.getString("starters.nether.icon", "NETHERRACK"));
-        if (netherIcon == null) netherIcon = Material.NETHERRACK;
-        List<String> netherLore = config.getStringList("starters.nether.lore");
-        inv.setItem(15, createGuiItem(netherIcon, config.getString("starters.nether.display-name", "&cNether Island"), netherLore.toArray(new String[0])));
+        List<String> starterIds = getStarterIds();
+        int[] slots = starterSlots();
+        for (int i = 0; i < Math.min(starterIds.size(), slots.length); i++) {
+            String starterId = starterIds.get(i);
+            String path = "starters." + starterId;
+            Material icon = Material.matchMaterial(config.getString(path + ".icon", "GRASS_BLOCK"));
+            if (icon == null) {
+                icon = Material.GRASS_BLOCK;
+            }
+            List<String> lore = new ArrayList<>(config.getStringList(path + ".lore"));
+            lore.add(" ");
+            lore.add("&8ID: " + starterId);
+            lore.add("&eKlik untuk memilih starter ini.");
+            inv.setItem(slots[i], createGuiItem(icon, config.getString(path + ".display-name", "&a" + starterId), lore.toArray(new String[0])));
+        }
 
         fillFiller(inv);
         player.openInventory(inv);
+    }
+
+    private List<String> getStarterIds() {
+        ConfigurationSection section = plugin.getConfigManager().getConfig().getConfigurationSection("starters");
+        if (section == null) {
+            return List.of("classic");
+        }
+        return section.getKeys(false).stream()
+                .filter(key -> section.getConfigurationSection(key) != null)
+                .toList();
+    }
+
+    private int[] starterSlots() {
+        return new int[]{10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
     }
 
     // ==========================================
@@ -998,9 +1017,31 @@ public class IslandGUI implements Listener {
                 player.performCommand("ai setlobby");
             }
             case 15 -> teleportToLobby(player);
+            case 19 -> {
+                player.closeInventory();
+                player.performCommand("ai admin repairworld");
+            }
+            case 20 -> {
+                player.closeInventory();
+                player.performCommand("ai admin worldtp");
+            }
+            case 21 -> {
+                player.closeInventory();
+                player.performCommand("ai admin borders");
+            }
             case 22 -> {
                 openMainMenu(player);
                 player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+            }
+            case 23 -> {
+                player.closeInventory();
+                player.performCommand("ai admin scan all");
+            }
+            case 24 -> {
+                closeAllAcidIslandInventories("&eGUI AcidIsland ditutup oleh admin.");
+                player.sendMessage(plugin.getConfigManager().format("&aSemua GUI AcidIsland yang terbuka sudah ditutup."));
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+                openAdminMenu(player);
             }
             case 31 -> player.closeInventory();
         }
@@ -1073,6 +1114,9 @@ public class IslandGUI implements Listener {
             case 16 -> setStoryStage(admin, targetUuid, 0);
             case 20 -> adminRemoveFromCurrentIsland(admin, targetUuid);
             case 21 -> adminSendTargetToLobby(admin, targetUuid);
+            case 22 -> adminCleanupTargetIsland(admin, targetUuid);
+            case 23 -> adminScanTargetIsland(admin, targetUuid);
+            case 24 -> adminRefreshTargetBorder(admin, targetUuid);
             case 31 -> {
                 openAdminPlayersGUI(admin, 0);
                 admin.playSound(admin.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
@@ -1112,9 +1156,14 @@ public class IslandGUI implements Listener {
 
     private void handleStarterClick(Player player, int slot) {
         String type = "";
-        if (slot == 11) type = "classic";
-        else if (slot == 13) type = "desert";
-        else if (slot == 15) type = "nether";
+        int[] slots = starterSlots();
+        List<String> starterIds = getStarterIds();
+        for (int i = 0; i < Math.min(slots.length, starterIds.size()); i++) {
+            if (slot == slots[i]) {
+                type = starterIds.get(i);
+                break;
+            }
+        }
 
         if (!type.isEmpty()) {
             if (plugin.getIslandManager().getIslandByPlayer(player.getUniqueId()) != null) {
@@ -1541,6 +1590,47 @@ public class IslandGUI implements Listener {
         target.teleport(plugin.getLobbyLocation());
         target.sendMessage(plugin.getConfigManager().format("&eKamu dipindahkan ke lobby oleh admin."));
         admin.sendMessage(plugin.getConfigManager().format("&a" + target.getName() + " dipindahkan ke lobby."));
+        admin.playSound(admin.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        openAdminPlayerGUI(admin, targetUuid);
+    }
+
+    private void adminCleanupTargetIsland(Player admin, UUID targetUuid) {
+        Island island = plugin.getIslandManager().getIslandByPlayer(targetUuid);
+        if (island == null) {
+            admin.sendMessage(plugin.getConfigManager().format("&cPlayer tersebut tidak punya island."));
+            admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+        plugin.getWorldManager().scheduleIslandCleanup(island);
+        admin.sendMessage(plugin.getConfigManager().format("&aCleanup island " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + " dijadwalkan."));
+        admin.playSound(admin.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        openAdminPlayerGUI(admin, targetUuid);
+    }
+
+    private void adminScanTargetIsland(Player admin, UUID targetUuid) {
+        Island island = plugin.getIslandManager().getIslandByPlayer(targetUuid);
+        if (island == null) {
+            admin.sendMessage(plugin.getConfigManager().format("&cPlayer tersebut tidak punya island."));
+            admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+        plugin.getWorldManager().scheduleIslandValueScan(island);
+        admin.sendMessage(plugin.getConfigManager().format("&aScan level island " + getOfflineName(Bukkit.getOfflinePlayer(targetUuid)) + " dijadwalkan."));
+        admin.playSound(admin.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        openAdminPlayerGUI(admin, targetUuid);
+    }
+
+    private void adminRefreshTargetBorder(Player admin, UUID targetUuid) {
+        Player target = Bukkit.getPlayer(targetUuid);
+        Island island = plugin.getIslandManager().getIslandByPlayer(targetUuid);
+        if (target == null || island == null) {
+            admin.sendMessage(plugin.getConfigManager().format("&cTarget harus online dan punya island."));
+            admin.playSound(admin.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+        plugin.getWorldManager().applyWorldBorder(target, island);
+        admin.sendMessage(plugin.getConfigManager().format("&aWorld border " + target.getName() + " direfresh."));
+        target.sendMessage(plugin.getConfigManager().format("&eWorld border island kamu direfresh oleh admin."));
         admin.playSound(admin.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
         openAdminPlayerGUI(admin, targetUuid);
     }

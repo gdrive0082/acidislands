@@ -23,7 +23,7 @@ final class AcidIslandCommandSpec {
     static final List<String> LEVEL_ACTIONS = List.of("refresh");
     static final List<String> STORY_ACTIONS = List.of("start");
     static final List<String> ROLE_NAMES = List.of("member", "trusted", "co_owner");
-    static final List<String> ADMIN_ACTIONS = List.of("delete", "reset", "tp", "story");
+    static final List<String> ADMIN_ACTIONS = List.of("delete", "reset", "tp", "story", "repairworld", "worldtp", "save", "borders", "scan", "cleanup");
     static final List<String> ADMIN_STORY_ACTIONS = List.of("set", "get", "add");
     static final List<String> STORY_STAGE_SAMPLES = List.of("0", "1", "2", "3", "4", "5");
 
@@ -38,7 +38,8 @@ final class AcidIslandCommandSpec {
     );
     static final List<String> ADMIN_HELP_LINES = List.of(
             "setlobby|reload \u00a77- Admin maintenance.",
-            "admin <delete|reset|tp> <player> \u00a77- Kelola island player.",
+            "admin <delete|reset|tp|cleanup|scan> <player> \u00a77- Kelola island player.",
+            "admin <repairworld|worldtp|save|borders|scan all> \u00a77- Tools world dan maintenance.",
             "admin story <set|get|add> <player> [stage] \u00a77- Kelola progress story."
     );
 

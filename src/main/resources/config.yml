@@ -1,10 +1,10 @@
 # ==========================================
 # AcidIsland Config File
-# Oceanfix8: random under-island shipwreck or monument structures.
+# Oceanfix9: expanded admin tools, starter presets, and acid world delete recovery.
 # ==========================================
 
 # Versi template config.
-config-version: 16
+config-version: 17
 
 # Nama world tempat pulau AcidIsland dibuat.
 # acid-world adalah key aktif; world-name tetap dibaca sebagai fallback legacy.
@@ -144,6 +144,81 @@ starters:
       - "GOLDEN_AXE:1"
       - "GOLDEN_PICKAXE:1"
       - "GOLDEN_SHOVEL:1"
+  taiga:
+    display-name: "&2Taiga Island"
+    lore:
+      - "&7Pulau podzol dingin dengan spruce,"
+      - "&7fern, berry, dan chest starter."
+    icon: "SPRUCE_SAPLING"
+    chest-items:
+      - "SPRUCE_SAPLING:2"
+      - "SWEET_BERRIES:6"
+      - "ICE:2"
+      - "LAVA_BUCKET:1"
+      - "COOKED_BEEF:12"
+      - "STONE_AXE:1"
+      - "STONE_PICKAXE:1"
+      - "STONE_SHOVEL:1"
+  mushroom:
+    display-name: "&dMushroom Island"
+    lore:
+      - "&7Pulau mycelium kecil dengan jamur,"
+      - "&7moss, dan starter survival unik."
+    icon: "RED_MUSHROOM"
+    chest-items:
+      - "RED_MUSHROOM:3"
+      - "BROWN_MUSHROOM:3"
+      - "BONE_MEAL:8"
+      - "ICE:2"
+      - "LAVA_BUCKET:1"
+      - "BREAD:12"
+      - "STONE_AXE:1"
+      - "STONE_PICKAXE:1"
+  badlands:
+    display-name: "&6Badlands Island"
+    lore:
+      - "&7Pulau red sand dan terracotta,"
+      - "&7kering, tajam, dan cocok buat builder."
+    icon: "RED_SAND"
+    chest-items:
+      - "CACTUS:1"
+      - "RED_SAND:8"
+      - "TERRACOTTA:8"
+      - "ICE:2"
+      - "LAVA_BUCKET:1"
+      - "COOKED_BEEF:12"
+      - "STONE_PICKAXE:1"
+      - "STONE_SHOVEL:1"
+  mangrove:
+    display-name: "&aMangrove Island"
+    lore:
+      - "&7Pulau mud lembap dengan mangrove,"
+      - "&7akar, moss, dan clay."
+    icon: "MANGROVE_PROPAGULE"
+    chest-items:
+      - "MANGROVE_PROPAGULE:2"
+      - "MUD:8"
+      - "CLAY:8"
+      - "ICE:2"
+      - "LAVA_BUCKET:1"
+      - "BREAD:12"
+      - "STONE_AXE:1"
+      - "STONE_PICKAXE:1"
+  snow:
+    display-name: "&bSnow Island"
+    lore:
+      - "&7Pulau dingin sejajar air dengan snow,"
+      - "&7spruce, packed ice, dan starter food."
+    icon: "SNOW_BLOCK"
+    chest-items:
+      - "SPRUCE_SAPLING:2"
+      - "SNOW_BLOCK:8"
+      - "PACKED_ICE:2"
+      - "ICE:2"
+      - "LAVA_BUCKET:1"
+      - "COOKED_COD:12"
+      - "STONE_AXE:1"
+      - "STONE_PICKAXE:1"
 
 # Upgrades Configuration
 upgrades:
@@ -327,6 +402,31 @@ themes:
     icon: "NETHERRACK"
     biome: "NETHER_WASTES"
     cost: 5000
+  taiga:
+    display-name: "&2Old Growth Taiga"
+    icon: "SPRUCE_SAPLING"
+    biome: "OLD_GROWTH_PINE_TAIGA"
+    cost: 3500
+  mushroom:
+    display-name: "&dMushroom Fields"
+    icon: "MYCELIUM"
+    biome: "MUSHROOM_FIELDS"
+    cost: 4500
+  badlands:
+    display-name: "&6Wooded Badlands"
+    icon: "RED_SAND"
+    biome: "WOODED_BADLANDS"
+    cost: 4500
+  mangrove:
+    display-name: "&aMangrove Swamp"
+    icon: "MANGROVE_PROPAGULE"
+    biome: "MANGROVE_SWAMP"
+    cost: 4500
+  snow:
+    display-name: "&bSnowy Taiga"
+    icon: "SNOW_BLOCK"
+    biome: "SNOWY_TAIGA"
+    cost: 4500
   ice:
     display-name: "&bFrozen Ocean"
     icon: "ICE"
