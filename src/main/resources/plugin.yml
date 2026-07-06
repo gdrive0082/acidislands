@@ -1,5 +1,5 @@
 name: AcidIsland
-version: '1.0-syncfix5-oceanfix7'
+version: '1.0-syncfix5-oceanfix8'
 main: id.alvarennation.acidIsland.AcidIsland
 api-version: '1.21'
 softdepend:

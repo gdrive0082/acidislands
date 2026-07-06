@@ -1,10 +1,10 @@
 # ==========================================
 # AcidIsland Config File
-# Oceanfix7: starter world border reduced to 15.
+# Oceanfix8: random under-island shipwreck or monument structures.
 # ==========================================
 
 # Versi template config.
-config-version: 15
+config-version: 16
 
 # Nama world tempat pulau AcidIsland dibuat.
 # acid-world adalah key aktif; world-name tetap dibaca sebagai fallback legacy.
@@ -29,8 +29,11 @@ starter-island:
   # 0/0 membuat shipwreck berada tepat di bawah island, bukan di samping island.
   shipwreck-offset-x: 0
   shipwreck-offset-z: 0
-  # Kedalaman minimal 22 blok agar kapal benar-benar tenggelam di bawah island.
-  shipwreck-depth-below-water: 22
+  # Struktur bawah island random: 50 berarti 50% monument, sisanya shipwreck.
+  monument-chance-percent: 50
+  # Kedalaman struktur dari permukaan air.
+  shipwreck-depth-below-water: 45
+  monument-depth-below-water: 60
 
 # Cooldown create/delete island untuk mencegah farming reset island.
 cooldowns:

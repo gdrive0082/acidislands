@@ -182,7 +182,7 @@ public class WorldManager {
             plugin.getLogger().warning("Failed to attach starter sheep leash at " + cx + ", " + cz + ": " + ex.getMessage());
         }
 
-        generateShipwreckMonument(cx, waterHeight, cz, random);
+        generateRandomUnderIslandStructure(cx, waterHeight, cz, random);
     }
 
     public CompletableFuture<Void> preloadStarterIslandChunks(int cx, int cz) {
@@ -405,12 +405,22 @@ public class WorldManager {
         }
     }
 
+    private void generateRandomUnderIslandStructure(int islandX, int waterHeight, int islandZ, Random random) {
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        int monumentChance = Math.max(0, Math.min(100, config.getInt("starter-island.monument-chance-percent", 50)));
+        if (coordinateNoise(islandX, islandZ, 151) * 100.0 < monumentChance) {
+            generatePrismarineMonument(islandX, waterHeight, islandZ, random);
+        } else {
+            generateShipwreckMonument(islandX, waterHeight, islandZ, random);
+        }
+    }
+
     private void generateShipwreckMonument(int islandX, int waterHeight, int islandZ, Random random) {
         World world = getAcidWorld();
         FileConfiguration config = plugin.getConfigManager().getConfig();
         int cx = islandX + config.getInt("starter-island.shipwreck-offset-x", 0);
         int cz = islandZ + config.getInt("starter-island.shipwreck-offset-z", 0);
-        int depth = Math.max(22, config.getInt("starter-island.shipwreck-depth-below-water", 22));
+        int depth = Math.max(45, config.getInt("starter-island.shipwreck-depth-below-water", 45));
         int cy = Math.max(world.getMinHeight() + 12, waterHeight - depth);
 
         generateShipwreckHull(world, cx, cy, cz, waterHeight);
@@ -454,6 +464,130 @@ public class WorldManager {
             } else {
                 placeSeaPickle(world, x, Math.min(waterHeight, y + 1), z, 1 + random.nextInt(4));
             }
+        }
+    }
+
+    private void generatePrismarineMonument(int islandX, int waterHeight, int islandZ, Random random) {
+        World world = getAcidWorld();
+        FileConfiguration config = plugin.getConfigManager().getConfig();
+        int depth = Math.max(60, config.getInt("starter-island.monument-depth-below-water", 60));
+        int cy = Math.max(world.getMinHeight() + 10, waterHeight - depth);
+
+        generateMonumentBase(world, islandX, cy, islandZ);
+        generateMonumentPillars(world, islandX, cy, islandZ);
+        generateMonumentSanctum(world, islandX, cy, islandZ);
+        decorateMonument(world, islandX, cy, islandZ, waterHeight, random);
+        fillMonumentChest(world, islandX, cy, islandZ, random);
+    }
+
+    private void generateMonumentBase(World world, int cx, int cy, int cz) {
+        for (int dx = -8; dx <= 8; dx++) {
+            for (int dz = -7; dz <= 7; dz++) {
+                double shape = (dx * dx) / 64.0 + (dz * dz) / 49.0;
+                if (shape > 1.0) {
+                    continue;
+                }
+                boolean edge = shape > 0.72;
+                Material floor = edge ? Material.DARK_PRISMARINE : Material.PRISMARINE_BRICKS;
+                setBlock(world, cx + dx, cy, cz + dz, floor);
+                if (edge && coordinateNoise(cx + dx, cz + dz, 173) > 0.18) {
+                    setBlock(world, cx + dx, cy + 1, cz + dz, Material.PRISMARINE);
+                    if (coordinateNoise(cx + dx, cz + dz, 179) > 0.72) {
+                        setBlock(world, cx + dx, cy + 2, cz + dz, Material.SEA_LANTERN);
+                    }
+                }
+            }
+        }
+
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                if (Math.abs(dx) + Math.abs(dz) <= 5) {
+                    setBlock(world, cx + dx, cy + 1, cz + dz, Material.PRISMARINE);
+                }
+            }
+        }
+    }
+
+    private void generateMonumentPillars(World world, int cx, int cy, int cz) {
+        int[][] pillars = {
+                {-6, -4}, {-6, 4}, {6, -4}, {6, 4},
+                {-3, -6}, {3, -6}, {-3, 6}, {3, 6}
+        };
+        for (int[] pillar : pillars) {
+            int px = cx + pillar[0];
+            int pz = cz + pillar[1];
+            for (int y = cy + 1; y <= cy + 8; y++) {
+                Material material = y == cy + 4 ? Material.SEA_LANTERN : Material.PRISMARINE_BRICKS;
+                setBlock(world, px, y, pz, material);
+            }
+            setBlock(world, px, cy + 9, pz, Material.DARK_PRISMARINE);
+            setBlock(world, px, cy + 10, pz, Material.SEA_LANTERN);
+        }
+    }
+
+    private void generateMonumentSanctum(World world, int cx, int cy, int cz) {
+        for (int y = cy + 2; y <= cy + 7; y++) {
+            for (int dx = -3; dx <= 3; dx++) {
+                for (int dz = -3; dz <= 3; dz++) {
+                    boolean wall = Math.abs(dx) == 3 || Math.abs(dz) == 3;
+                    boolean doorway = (Math.abs(dx) <= 1 && Math.abs(dz) == 3 && y <= cy + 4)
+                            || (Math.abs(dz) <= 1 && Math.abs(dx) == 3 && y <= cy + 4);
+                    if (wall && !doorway) {
+                        Material material = y == cy + 7 ? Material.DARK_PRISMARINE : Material.PRISMARINE_BRICKS;
+                        setBlock(world, cx + dx, y, cz + dz, material);
+                    }
+                }
+            }
+        }
+
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                if (Math.abs(dx) + Math.abs(dz) <= 6) {
+                    setBlock(world, cx + dx, cy + 8, cz + dz, Math.abs(dx) <= 1 && Math.abs(dz) <= 1 ? Material.SEA_LANTERN : Material.DARK_PRISMARINE);
+                }
+            }
+        }
+        setBlock(world, cx, cy + 9, cz, Material.PRISMARINE_BRICKS);
+        setBlock(world, cx, cy + 10, cz, Material.SEA_LANTERN);
+    }
+
+    private void decorateMonument(World world, int cx, int cy, int cz, int waterHeight, Random random) {
+        for (int i = 0; i < 34; i++) {
+            int x = cx - 10 + random.nextInt(21);
+            int z = cz - 9 + random.nextInt(19);
+            int y = cy + random.nextInt(5);
+            if (random.nextDouble() < 0.35) {
+                setBlock(world, x, y, z, random.nextBoolean() ? Material.PRISMARINE : Material.PRISMARINE_BRICKS);
+            } else if (random.nextDouble() < 0.6) {
+                placeSeaPickle(world, x, Math.min(waterHeight, y + 1), z, 1 + random.nextInt(4));
+            } else {
+                setBlock(world, x, y, z, Material.SEA_LANTERN);
+            }
+        }
+    }
+
+    private void fillMonumentChest(World world, int cx, int cy, int cz, Random random) {
+        Block chestBlock = world.getBlockAt(cx, cy + 3, cz);
+        chestBlock.setType(Material.CHEST, false);
+        if (!(chestBlock.getState() instanceof Chest chest)) {
+            return;
+        }
+
+        Inventory inv = chest.getInventory();
+        ItemStack potion = new ItemStack(Material.POTION);
+        PotionMeta meta = (PotionMeta) potion.getItemMeta();
+        if (meta != null) {
+            meta.addCustomEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, 20 * 60 * 8, 0), true);
+            meta.setDisplayName("§bWater Breathing Potion (Acid Immunity)");
+            potion.setItemMeta(meta);
+        }
+        inv.addItem(potion);
+        inv.addItem(new ItemStack(Material.PRISMARINE_SHARD, 10));
+        inv.addItem(new ItemStack(Material.PRISMARINE_CRYSTALS, 8));
+        inv.addItem(new ItemStack(Material.SEA_LANTERN, 2));
+        inv.addItem(new ItemStack(Material.GOLD_INGOT, 2 + random.nextInt(3)));
+        if (random.nextDouble() < 0.35) {
+            inv.addItem(new ItemStack(Material.HEART_OF_THE_SEA, 1));
         }
     }
 

@@ -78,7 +78,7 @@ public class ConfigManager {
 
     private void migrateConfig() {
         int previousVersion = config.getInt("config-version", 0);
-        int bundledVersion = 15;
+        int bundledVersion = 16;
         try (InputStream defaultsStream = plugin.getResource("config.yml")) {
             if (defaultsStream != null) {
                 FileConfiguration defaults = YamlConfiguration.loadConfiguration(
@@ -96,6 +96,7 @@ public class ConfigManager {
         migrateCooldown("cooldowns.delete-seconds", previousVersion);
         migrateStarterIslandLayout(previousVersion);
         migrateStarterBorder(previousVersion);
+        migrateUnderIslandStructures(previousVersion);
         if (previousVersion < bundledVersion) {
             config.set("config-version", bundledVersion);
         }
@@ -126,9 +127,24 @@ public class ConfigManager {
         migrateIntWhenDefault("upgrades.border.1.size", 50, 15);
     }
 
+    private void migrateUnderIslandStructures(int previousVersion) {
+        if (previousVersion >= 16) {
+            return;
+        }
+        migrateIntWhenDefault("starter-island.shipwreck-depth-below-water", 22, 45);
+        setIntWhenMissing("starter-island.monument-chance-percent", 50);
+        setIntWhenMissing("starter-island.monument-depth-below-water", 60);
+    }
+
     private void migrateIntWhenDefault(String path, int oldDefault, int newDefault) {
         if (!config.contains(path) || config.getInt(path) == oldDefault) {
             config.set(path, newDefault);
+        }
+    }
+
+    private void setIntWhenMissing(String path, int value) {
+        if (!config.isSet(path)) {
+            config.set(path, value);
         }
     }
 
