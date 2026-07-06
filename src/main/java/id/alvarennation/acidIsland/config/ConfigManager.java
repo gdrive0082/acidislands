@@ -78,7 +78,7 @@ public class ConfigManager {
 
     private void migrateConfig() {
         int previousVersion = config.getInt("config-version", 0);
-        int bundledVersion = 17;
+        int bundledVersion = 18;
         try (InputStream defaultsStream = plugin.getResource("config.yml")) {
             if (defaultsStream != null) {
                 FileConfiguration defaults = YamlConfiguration.loadConfiguration(
@@ -97,6 +97,7 @@ public class ConfigManager {
         migrateStarterIslandLayout(previousVersion);
         migrateStarterBorder(previousVersion);
         migrateUnderIslandStructures(previousVersion);
+        migrateDeepUnderIslandStructures(previousVersion);
         if (previousVersion < bundledVersion) {
             config.set("config-version", bundledVersion);
         }
@@ -133,6 +134,14 @@ public class ConfigManager {
         }
         migrateIntWhenDefault("starter-island.shipwreck-depth-below-water", 22, 45);
         setIntWhenMissing("starter-island.monument-chance-percent", 50);
+        setIntWhenMissing("starter-island.monument-depth-below-water", 60);
+    }
+
+    private void migrateDeepUnderIslandStructures(int previousVersion) {
+        if (previousVersion >= 18) {
+            return;
+        }
+        migrateIntWhenDefault("starter-island.shipwreck-depth-below-water", 45, 60);
         setIntWhenMissing("starter-island.monument-depth-below-water", 60);
     }
 

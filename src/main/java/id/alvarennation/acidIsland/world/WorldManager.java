@@ -495,7 +495,7 @@ public class WorldManager {
         FileConfiguration config = plugin.getConfigManager().getConfig();
         int cx = islandX + config.getInt("starter-island.shipwreck-offset-x", 0);
         int cz = islandZ + config.getInt("starter-island.shipwreck-offset-z", 0);
-        int depth = Math.max(45, config.getInt("starter-island.shipwreck-depth-below-water", 45));
+        int depth = Math.max(60, config.getInt("starter-island.shipwreck-depth-below-water", 60));
         int cy = Math.max(world.getMinHeight() + 12, waterHeight - depth);
 
         generateShipwreckHull(world, cx, cy, cz, waterHeight);
@@ -807,7 +807,7 @@ public class WorldManager {
 
         int level = island.getLevel("border");
         FileConfiguration config = plugin.getConfigManager().getConfig();
-        int size = config.getInt("upgrades.border." + level + ".size", 50);
+        int size = config.getInt("upgrades.border." + level + ".size", 15);
 
         WorldBorder border = Bukkit.createWorldBorder();
         border.setCenter(island.getX(), island.getZ());

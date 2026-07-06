@@ -1,10 +1,10 @@
 # ==========================================
 # AcidIsland Config File
-# Oceanfix9: expanded admin tools, starter presets, and acid world delete recovery.
+# Oceanfix10: starter border fallback 15 and deep structures at 60 blocks.
 # ==========================================
 
 # Versi template config.
-config-version: 17
+config-version: 18
 
 # Nama world tempat pulau AcidIsland dibuat.
 # acid-world adalah key aktif; world-name tetap dibaca sebagai fallback legacy.
@@ -32,7 +32,7 @@ starter-island:
   # Struktur bawah island random: 50 berarti 50% monument, sisanya shipwreck.
   monument-chance-percent: 50
   # Kedalaman struktur dari permukaan air.
-  shipwreck-depth-below-water: 45
+  shipwreck-depth-below-water: 60
   monument-depth-below-water: 60
 
 # Cooldown create/delete island untuk mencegah farming reset island.

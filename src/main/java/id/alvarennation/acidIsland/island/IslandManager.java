@@ -462,7 +462,7 @@ public class IslandManager {
 
     public int getBorderSize(Island island) {
         int level = island.getLevel("border");
-        return plugin.getConfigManager().getConfig().getInt("upgrades.border." + level + ".size", 50);
+        return plugin.getConfigManager().getConfig().getInt("upgrades.border." + level + ".size", 15);
     }
 
     public long getIslandValue(Island island, boolean forceRefresh) {
@@ -555,11 +555,11 @@ public class IslandManager {
     private int getMaxConfiguredBorderSize() {
         ConfigurationSection section = plugin.getConfigManager().getConfig().getConfigurationSection("upgrades.border");
         if (section == null) {
-            return 50;
+            return 15;
         }
-        int max = 50;
+        int max = 15;
         for (String key : section.getKeys(false)) {
-            max = Math.max(max, section.getInt(key + ".size", 50));
+            max = Math.max(max, section.getInt(key + ".size", 15));
         }
         return max;
     }

@@ -65,7 +65,7 @@ public class PlaceholderHook {
                 case "border_size" -> {
                     if (island == null) return "0";
                     int level = island.getLevel("border");
-                    return String.valueOf(plugin.getConfigManager().getConfig().getInt("upgrades.border." + level + ".size", 50));
+                    return String.valueOf(plugin.getConfigManager().getConfig().getInt("upgrades.border." + level + ".size", 15));
                 }
                 case "bank_balance" -> {
                     return island != null ? String.valueOf(island.getBankBalance()) : "0.0";
